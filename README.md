@@ -1,6 +1,6 @@
-# Ranvex API
+# Citra Negara LMS API
 
-Backend REST API untuk Ranvex.
+Backend REST API untuk Citra Negara LMS.
 
 Baseline stack mengikuti Absensi CN: Go, Gin, GORM, MySQL, JWT, bcrypt,
 golang-migrate, validator, Excelize, dan Cloudinary opsional.

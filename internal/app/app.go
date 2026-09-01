@@ -1,8 +1,8 @@
 package app
 
 import (
-	"ranvex-api/internal/config"
-	"ranvex-api/internal/router"
+	"lms-cn-api/internal/config"
+	"lms-cn-api/internal/router"
 )
 
 type Server struct {

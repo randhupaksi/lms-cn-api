@@ -1,6 +1,6 @@
-# Ranvex API Architecture
+# Citra Negara LMS API Architecture
 
-Ranvex API uses a pragmatic modular monolith. It keeps deployment simple while
+Citra Negara LMS API uses a pragmatic modular monolith. It keeps deployment simple while
 giving each future business domain a clear ownership boundary.
 
 ```text

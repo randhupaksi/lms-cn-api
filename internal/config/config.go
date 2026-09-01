@@ -14,7 +14,7 @@ func Load() *Config {
 		AppEnv:    valueOrDefault("APP_ENV", "development"),
 		Port:      valueOrDefault("PORT", "8080"),
 		APIPrefix: valueOrDefault("API_PREFIX", "/api/v1"),
-		AppName:   valueOrDefault("APP_NAME", "Ranvex API"),
+		AppName:   valueOrDefault("APP_NAME", "Citra Negara LMS API"),
 	}
 }
 

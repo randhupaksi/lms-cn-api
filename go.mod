@@ -1,4 +1,4 @@
-module ranvex-api
+module lms-cn-api
 
 go 1.25.5
 
