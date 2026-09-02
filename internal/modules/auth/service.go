@@ -23,20 +23,28 @@ type Service struct {
 	audit      audit.Recorder
 	accessTTL  time.Duration
 	refreshTTL time.Duration
+	loginGuard *LoginGuard
 	now        func() time.Time
 }
 
-func NewService(repository *Repository, usersRepository *users.Repository, tokens *TokenManager, auditRecorder audit.Recorder, accessTTL, refreshTTL time.Duration) *Service {
+func NewService(repository *Repository, usersRepository *users.Repository, tokens *TokenManager, auditRecorder audit.Recorder, accessTTL, refreshTTL time.Duration, loginGuard *LoginGuard) *Service {
 	return &Service{
 		repository: repository, users: usersRepository, tokens: tokens, audit: auditRecorder,
-		accessTTL: accessTTL, refreshTTL: refreshTTL, now: time.Now,
+		accessTTL: accessTTL, refreshTTL: refreshTTL, loginGuard: loginGuard, now: time.Now,
 	}
 }
 
 func (s *Service) Login(ctx context.Context, request LoginRequest) (SessionResponse, string, error) {
-	user, err := s.users.FindByIdentifier(ctx, strings.TrimSpace(request.Identifier))
+	identifier := strings.TrimSpace(request.Identifier)
+	if s.loginGuard != nil && !s.loginGuard.Consume(identifier) {
+		return SessionResponse{}, "", apperror.New(http.StatusTooManyRequests, "LOGIN_RATE_LIMIT_EXCEEDED", "Terlalu banyak percobaan masuk. Silakan coba lagi beberapa saat")
+	}
+	user, err := s.users.FindByIdentifier(ctx, identifier)
 	if err != nil || !user.IsActive() || bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(request.Password)) != nil {
 		return SessionResponse{}, "", apperror.New(http.StatusUnauthorized, "INVALID_CREDENTIALS", "Identifier atau password tidak valid")
+	}
+	if s.loginGuard != nil {
+		s.loginGuard.Reset(identifier)
 	}
 
 	now := s.now().UTC()

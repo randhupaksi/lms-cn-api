@@ -30,8 +30,8 @@ func NewHandler(service *Service, cfg *config.Config) *Handler {
 	}
 }
 
-func (h *Handler) RegisterPublicRoutes(group *gin.RouterGroup) {
-	group.POST("/login", h.login)
+func (h *Handler) RegisterPublicRoutes(group *gin.RouterGroup, loginMiddleware gin.HandlerFunc) {
+	group.POST("/login", loginMiddleware, h.login)
 	group.POST("/refresh", h.refresh)
 }
 
