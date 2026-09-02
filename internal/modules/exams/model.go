@@ -20,6 +20,8 @@ type Exam struct {
 	DurationMinutes     uint
 	MaxAttempts         uint
 	AllowBackNavigation bool
+	RandomizeQuestions  bool
+	RandomizeOptions    bool
 	ResultPolicy        string `gorm:"size:24;not null"`
 	PublishedAt         *time.Time
 	Questions           []ExamQuestion `gorm:"foreignKey:ExamID"`

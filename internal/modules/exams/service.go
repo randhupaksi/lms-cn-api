@@ -43,7 +43,8 @@ func (s *Service) Create(ctx context.Context, actor authz.Principal, request Wri
 		Title: strings.TrimSpace(request.Title), Description: strings.TrimSpace(request.Description),
 		Status: StatusDraft, StartsAt: request.StartsAt.UTC(), EndsAt: request.EndsAt.UTC(),
 		DurationMinutes: request.DurationMinutes, MaxAttempts: 1,
-		AllowBackNavigation: request.AllowBackNavigation, ResultPolicy: "after_publish",
+		AllowBackNavigation: request.AllowBackNavigation, RandomizeQuestions: request.RandomizeQuestions,
+		RandomizeOptions: request.RandomizeOptions, ResultPolicy: "after_publish",
 	}
 	if err := s.repository.Create(ctx, &exam); err != nil {
 		return Response{}, apperror.Wrap(http.StatusInternalServerError, "EXAM_CREATE_FAILED", "Gagal membuat ujian", err)
@@ -108,6 +109,8 @@ func (s *Service) Update(ctx context.Context, actor authz.Principal, id string, 
 		exam.EndsAt = request.EndsAt.UTC()
 		exam.DurationMinutes = request.DurationMinutes
 		exam.AllowBackNavigation = request.AllowBackNavigation
+		exam.RandomizeQuestions = request.RandomizeQuestions
+		exam.RandomizeOptions = request.RandomizeOptions
 	})
 	if err != nil {
 		return Response{}, mapExamError(err)

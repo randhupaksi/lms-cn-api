@@ -10,6 +10,8 @@ type WriteRequest struct {
 	EndsAt              time.Time `json:"ends_at" binding:"required"`
 	DurationMinutes     uint      `json:"duration_minutes" binding:"required,min=1,max=1440"`
 	AllowBackNavigation bool      `json:"allow_back_navigation"`
+	RandomizeQuestions  bool      `json:"randomize_questions"`
+	RandomizeOptions    bool      `json:"randomize_options"`
 }
 
 type QuestionSelection struct {
@@ -53,6 +55,8 @@ type Response struct {
 	DurationMinutes     uint               `json:"duration_minutes"`
 	MaxAttempts         uint               `json:"max_attempts"`
 	AllowBackNavigation bool               `json:"allow_back_navigation"`
+	RandomizeQuestions  bool               `json:"randomize_questions"`
+	RandomizeOptions    bool               `json:"randomize_options"`
 	ResultPolicy        string             `json:"result_policy"`
 	PublishedAt         *time.Time         `json:"published_at"`
 	QuestionCount       int                `json:"question_count"`
@@ -68,6 +72,7 @@ func toResponse(exam Exam, participantCount int64, includeQuestions bool) Respon
 		Description: exam.Description, Status: exam.Status, StartsAt: exam.StartsAt, EndsAt: exam.EndsAt,
 		DurationMinutes: exam.DurationMinutes, MaxAttempts: exam.MaxAttempts,
 		AllowBackNavigation: exam.AllowBackNavigation, ResultPolicy: exam.ResultPolicy,
+		RandomizeQuestions: exam.RandomizeQuestions, RandomizeOptions: exam.RandomizeOptions,
 		PublishedAt: exam.PublishedAt, QuestionCount: len(exam.Questions), ParticipantCount: participantCount,
 	}
 	for _, question := range exam.Questions {

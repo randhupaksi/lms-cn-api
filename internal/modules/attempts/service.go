@@ -2,8 +2,11 @@ package attempts
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
 	"errors"
 	"log/slog"
+	"math/rand"
 	"net/http"
 	"strings"
 	"time"
@@ -127,10 +130,18 @@ func (s *Service) FinalizeExpired(ctx context.Context, limit int) error {
 }
 
 func buildStartResponse(attempt Attempt, exam exams.Exam, now time.Time) StartResponse {
-	questions := make([]exams.QuestionResponse, len(exam.Questions))
-	for i, question := range exam.Questions {
-		options := make([]exams.OptionResponse, len(question.Options))
-		for j, option := range question.Options {
+	examQuestions := append([]exams.ExamQuestion(nil), exam.Questions...)
+	if exam.RandomizeQuestions {
+		shuffleStable(examQuestions, attempt.ID+":questions")
+	}
+	questions := make([]exams.QuestionResponse, len(examQuestions))
+	for i, question := range examQuestions {
+		questionOptions := append([]exams.ExamQuestionOption(nil), question.Options...)
+		if exam.RandomizeOptions {
+			shuffleStable(questionOptions, attempt.ID+":"+question.ID+":options")
+		}
+		options := make([]exams.OptionResponse, len(questionOptions))
+		for j, option := range questionOptions {
 			options[j] = exams.OptionResponse{ID: option.ID, Content: option.Content, Position: option.Position}
 		}
 		questions[i] = exams.QuestionResponse{ID: question.ID, SourceQuestionID: question.SourceQuestionID, Type: question.Type, Stem: question.Stem, Position: question.Position, Points: question.Points, Options: options}
@@ -140,6 +151,14 @@ func buildStartResponse(attempt Attempt, exam exams.Exam, now time.Time) StartRe
 		answers[i] = toAnswerResponse(answer)
 	}
 	return StartResponse{AttemptID: attempt.ID, Status: attempt.Status, StartedAt: attempt.StartedAt, DeadlineAt: attempt.DeadlineAt, ServerTime: now, AllowBackNavigation: exam.AllowBackNavigation, Questions: questions, Answers: answers, SubmissionReceipt: attempt.SubmissionReceipt, SubmittedAt: attempt.SubmittedAt}
+}
+
+func shuffleStable[T any](values []T, key string) {
+	hash := sha256.Sum256([]byte(key))
+	seed := int64(binary.LittleEndian.Uint64(hash[:8]))
+	rand.New(rand.NewSource(seed)).Shuffle(len(values), func(i, j int) {
+		values[i], values[j] = values[j], values[i]
+	})
 }
 
 func toAnswerResponse(answer Answer) AnswerResponse {
