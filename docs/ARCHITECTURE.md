@@ -29,8 +29,10 @@ pkg is reusable and domain-agnostic
 ```
 
 Implemented modules are `auth`, `users`, `academics`, `questions`, `exams`,
-`attempts`, `grading`, `results`, and `audit`. Cross-module access uses explicit
-service boundaries for course ownership and enrollment checks.
+`attempts`, `grading`, `results`, `audit`, `monitoring`, `materials`,
+`assignments`, and `analytics`. Cross-module access uses explicit service
+boundaries for course ownership and enrollment checks. Query composition stays
+inside each repository; services coordinate authorization and business rules.
 
 ## Security and exam integrity
 
@@ -44,6 +46,18 @@ service boundaries for course ownership and enrollment checks.
 - Deadlines, finalization, objective grading, result visibility, and ownership
   checks are enforced in database-backed API transactions.
 - Student contracts omit correct-answer fields.
+
+## Operations and observability
+
+- `/health/live` reports process liveness; `/health` verifies database
+  readiness before reporting the service ready.
+- Structured request logs include request ID, route, status, latency, and
+  client address without request bodies, credentials, answers, or tokens.
+- Login protection combines a network-level request ceiling with a stricter
+  per-identifier throttle whose in-memory key is SHA-256 hashed.
+- Audit reads are admin-only and operational monitoring remains course-scoped.
+- Versioned migrations are the only production schema path. Backup, restore,
+  load-test, and incident procedures are documented in `docs/OPERATIONS.md`.
 
 ## Conventions
 
