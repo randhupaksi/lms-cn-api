@@ -28,9 +28,22 @@ cmd -> app -> router/middleware -> module handlers -> module services -> infrast
 pkg is reusable and domain-agnostic
 ```
 
-The router currently exposes only a health endpoint. Authentication,
-authorization, exam integrity, and business modules are intentionally deferred
-until product requirements are reviewed.
+Implemented modules are `auth`, `users`, `academics`, `questions`, `exams`,
+`attempts`, `grading`, `results`, and `audit`. Cross-module access uses explicit
+service boundaries for course ownership and enrollment checks.
+
+## Security and exam integrity
+
+- Short-lived JWT access tokens identify a revocable server-side session.
+- Refresh tokens are opaque, hashed at rest, rotated, and delivered through an
+  HttpOnly cookie. Disabled users and revoked sessions are rejected server-side.
+- Temporary credentials carry a signed password-change requirement and cannot
+  access business endpoints until changed.
+- Exam questions and answer options are snapshotted before publication.
+- Attempt start and every answer save use durable idempotency records.
+- Deadlines, finalization, objective grading, result visibility, and ownership
+  checks are enforced in database-backed API transactions.
+- Student contracts omit correct-answer fields.
 
 ## Conventions
 
