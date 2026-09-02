@@ -61,7 +61,7 @@ func (r *Repository) FindCourse(ctx context.Context, id string) (Course, error) 
 }
 
 func (r *Repository) ListCourses(ctx context.Context, principalRole, userID string, page pagination.Request) ([]Course, int64, error) {
-	query := r.db.WithContext(ctx).Model(&Course{}).Distinct("courses.*")
+	query := r.db.WithContext(ctx).Model(&Course{})
 	switch principalRole {
 	case string(users.RoleTeacher):
 		query = query.Joins("JOIN course_teachers ct ON ct.course_id = courses.id AND ct.teacher_id = ?", userID)
@@ -69,11 +69,13 @@ func (r *Repository) ListCourses(ctx context.Context, principalRole, userID stri
 		query = query.Joins("JOIN course_students cs ON cs.course_id = courses.id AND cs.student_id = ?", userID)
 	}
 	var total int64
-	if err := query.Count(&total).Error; err != nil {
+	if err := query.Session(&gorm.Session{}).
+		Select("COUNT(DISTINCT courses.id)").
+		Scan(&total).Error; err != nil {
 		return nil, 0, err
 	}
 	var result []Course
-	err := query.Preload("AcademicYear").Preload("ClassGroup").Preload("Subject").
+	err := query.Distinct("courses.*").Preload("AcademicYear").Preload("ClassGroup").Preload("Subject").
 		Order("courses.name ASC").Offset(page.Offset()).Limit(page.PerPage).Find(&result).Error
 	return result, total, err
 }
