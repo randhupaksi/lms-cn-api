@@ -39,6 +39,15 @@ func (r *Repository) ListByExam(ctx context.Context, examID string, page paginat
 	return rows, total, err
 }
 
+func (r *Repository) ExportByExam(ctx context.Context, examID string) ([]resultRow, error) {
+	var rows []resultRow
+	err := r.db.WithContext(ctx).Table("results r").
+		Select("r.*, e.title AS exam_title, u.full_name AS student_name, u.identifier").
+		Joins("JOIN exams e ON e.id = r.exam_id").Joins("JOIN users u ON u.id = r.student_id").
+		Where("r.exam_id = ?", examID).Order("u.full_name ASC").Scan(&rows).Error
+	return rows, err
+}
+
 func (r *Repository) PublishByExam(ctx context.Context, examID string, now time.Time) (int64, error) {
 	result := r.db.WithContext(ctx).Model(&Result{}).Where("exam_id = ? AND status IN ?", examID, []string{"draft", "reviewed"}).Updates(map[string]any{"status": "published", "published_at": now})
 	return result.RowsAffected, result.Error

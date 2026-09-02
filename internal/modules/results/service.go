@@ -44,6 +44,25 @@ func (s *Service) ListByExam(ctx context.Context, actor authz.Principal, examID 
 	return result, total, nil
 }
 
+func (s *Service) ExportByExam(ctx context.Context, actor authz.Principal, examID string) ([]Response, error) {
+	courseID, err := s.repository.ExamCourseID(ctx, examID)
+	if err != nil {
+		return nil, mapResultError(err)
+	}
+	if err := s.academics.RequireCourseManager(ctx, actor, courseID); err != nil {
+		return nil, err
+	}
+	rows, err := s.repository.ExportByExam(ctx, examID)
+	if err != nil {
+		return nil, mapResultError(err)
+	}
+	result := make([]Response, len(rows))
+	for index, row := range rows {
+		result[index] = toResponse(row, true)
+	}
+	return result, nil
+}
+
 func (s *Service) PublishByExam(ctx context.Context, actor authz.Principal, examID string) (int64, error) {
 	if actor.Role != string(users.RoleTeacher) {
 		return 0, apperror.New(http.StatusForbidden, "RESULT_PUBLISH_DENIED", "Hanya guru yang ditugaskan dapat mempublikasikan hasil")

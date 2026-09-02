@@ -1,7 +1,10 @@
 package results
 
 import (
+	"bytes"
+	"encoding/csv"
 	"net/http"
+	"strconv"
 
 	"lms-cn-api/internal/middleware"
 	"lms-cn-api/pkg/pagination"
@@ -17,7 +20,39 @@ func NewHandler(service *Service) *Handler { return &Handler{service: service} }
 
 func (h *Handler) RegisterStaffRoutes(group *gin.RouterGroup) {
 	group.GET("", h.listByExam)
+	group.GET("/export", h.exportByExam)
 	group.POST("/exams/:examID/publish", h.publishByExam)
+}
+
+func (h *Handler) exportByExam(c *gin.Context) {
+	examID := c.Query("exam_id")
+	if examID == "" {
+		response.Error(c, http.StatusBadRequest, "EXAM_ID_REQUIRED", "Ujian wajib dipilih")
+		return
+	}
+	principal, _ := middleware.Principal(c)
+	data, err := h.service.ExportByExam(c.Request.Context(), principal, examID)
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	var buffer bytes.Buffer
+	writer := csv.NewWriter(&buffer)
+	_ = writer.Write([]string{"Nama siswa", "Identitas", "Ujian", "Skor", "Skor maksimal", "Persentase", "Status", "Dinilai pada", "Dipublikasikan pada"})
+	for _, item := range data {
+		publishedAt := ""
+		if item.PublishedAt != nil {
+			publishedAt = item.PublishedAt.UTC().Format("2006-01-02T15:04:05Z")
+		}
+		_ = writer.Write([]string{item.StudentName, item.Identifier, item.ExamTitle, strconv.FormatFloat(item.Score, 'f', 2, 64), strconv.FormatFloat(item.MaxScore, 'f', 2, 64), strconv.FormatFloat(item.Percentage, 'f', 2, 64), item.Status, item.GradedAt.UTC().Format("2006-01-02T15:04:05Z"), publishedAt})
+	}
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		response.Error(c, http.StatusInternalServerError, "RESULT_EXPORT_FAILED", "Gagal membuat export hasil")
+		return
+	}
+	c.Header("Content-Disposition", `attachment; filename="hasil-ujian.csv"`)
+	c.Data(http.StatusOK, "text/csv; charset=utf-8", append([]byte{0xEF, 0xBB, 0xBF}, buffer.Bytes()...))
 }
 
 func (h *Handler) RegisterStudentRoutes(group *gin.RouterGroup) {
