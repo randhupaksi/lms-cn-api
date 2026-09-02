@@ -29,6 +29,16 @@ func New() (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := database.RunMigrations(context.Background(), connection.GORM, cfg.MigrationsPath); err != nil {
+		_ = connection.Close()
+		return nil, fmt.Errorf("run database migrations: %w", err)
+	}
+	if cfg.SeedDemoData {
+		if err := database.SeedDemoData(context.Background(), connection.GORM); err != nil {
+			_ = connection.Close()
+			return nil, fmt.Errorf("seed demo data: %w", err)
+		}
+	}
 	engine, err := router.New(cfg, connection.GORM)
 	if err != nil {
 		_ = connection.Close()
