@@ -12,7 +12,16 @@ type WriteRequest struct {
 	Type          string          `json:"type" binding:"required,oneof=single_choice"`
 	Stem          string          `json:"stem" binding:"required,max=10000"`
 	DefaultPoints float64         `json:"default_points" binding:"required,gt=0,lte=1000"`
+	Category      string          `json:"category" binding:"max=80"`
+	Tags          []string        `json:"tags" binding:"max=10,dive,max=40"`
 	Options       []OptionRequest `json:"options" binding:"required,min=2,max=10,dive"`
+}
+
+type ListFilter struct {
+	Category string
+	Tag      string
+	Status   string
+	Search   string
 }
 
 type OptionResponse struct {
@@ -29,6 +38,8 @@ type Response struct {
 	Type          string           `json:"type"`
 	Stem          string           `json:"stem"`
 	DefaultPoints float64          `json:"default_points"`
+	Category      string           `json:"category"`
+	Tags          []string         `json:"tags"`
 	Status        string           `json:"status"`
 	Version       uint             `json:"version"`
 	Options       []OptionResponse `json:"options"`
@@ -44,6 +55,7 @@ func toResponse(question Question) Response {
 	return Response{
 		ID: question.ID, CourseID: question.CourseID, AuthorID: question.AuthorID,
 		Type: question.Type, Stem: question.Stem, DefaultPoints: question.DefaultPoints,
+		Category: question.Category, Tags: question.Tags,
 		Status: question.Status, Version: question.Version, Options: options,
 		CreatedAt: question.CreatedAt, UpdatedAt: question.UpdatedAt,
 	}

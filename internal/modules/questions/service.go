@@ -39,6 +39,7 @@ func (s *Service) Create(ctx context.Context, actor authz.Principal, request Wri
 	question := Question{
 		ID: uuid.NewString(), CourseID: request.CourseID, AuthorID: actor.UserID,
 		Type: request.Type, Stem: strings.TrimSpace(request.Stem), DefaultPoints: request.DefaultPoints,
+		Category: strings.TrimSpace(request.Category), Tags: normalizeTags(request.Tags),
 		Status: "active", Version: 1,
 	}
 	question.Options = buildOptions(question.ID, request.Options)
@@ -49,11 +50,17 @@ func (s *Service) Create(ctx context.Context, actor authz.Principal, request Wri
 	return toResponse(question), nil
 }
 
-func (s *Service) List(ctx context.Context, actor authz.Principal, courseID string, page pagination.Request) ([]Response, int64, error) {
+func (s *Service) List(ctx context.Context, actor authz.Principal, courseID string, page pagination.Request, filter ListFilter) ([]Response, int64, error) {
 	if err := s.academics.RequireCourseManager(ctx, actor, courseID); err != nil {
 		return nil, 0, err
 	}
-	values, total, err := s.repository.List(ctx, courseID, page)
+	filter.Category = strings.TrimSpace(filter.Category)
+	filter.Tag = strings.ToLower(strings.TrimSpace(filter.Tag))
+	filter.Search = strings.TrimSpace(filter.Search)
+	if filter.Status != "" && filter.Status != "active" && filter.Status != "archived" {
+		return nil, 0, apperror.New(http.StatusBadRequest, "QUESTION_STATUS_INVALID", "Status soal tidak valid")
+	}
+	values, total, err := s.repository.List(ctx, courseID, page, filter)
 	if err != nil {
 		return nil, 0, apperror.Wrap(http.StatusInternalServerError, "QUESTIONS_READ_FAILED", "Gagal memuat bank soal", err)
 	}
@@ -85,6 +92,8 @@ func (s *Service) Update(ctx context.Context, actor authz.Principal, id string, 
 		question.Type = request.Type
 		question.Stem = strings.TrimSpace(request.Stem)
 		question.DefaultPoints = request.DefaultPoints
+		question.Category = strings.TrimSpace(request.Category)
+		question.Tags = normalizeTags(request.Tags)
 		question.Options = buildOptions(question.ID, request.Options)
 	})
 	if err != nil {
@@ -132,6 +141,23 @@ func buildOptions(questionID string, requests []OptionRequest) []Option {
 	result := make([]Option, len(requests))
 	for index, option := range requests {
 		result[index] = Option{ID: uuid.NewString(), QuestionID: questionID, Content: strings.TrimSpace(option.Content), IsCorrect: option.IsCorrect, Position: uint(index + 1)}
+	}
+	return result
+}
+
+func normalizeTags(values []string) []string {
+	seen := make(map[string]struct{}, len(values))
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		tag := strings.ToLower(strings.TrimSpace(value))
+		if tag == "" {
+			continue
+		}
+		if _, exists := seen[tag]; exists {
+			continue
+		}
+		seen[tag] = struct{}{}
+		result = append(result, tag)
 	}
 	return result
 }

@@ -30,7 +30,8 @@ func (h *Handler) list(c *gin.Context) {
 	}
 	principal, _ := middleware.Principal(c)
 	page := pagination.FromContext(c)
-	data, total, err := h.service.List(c.Request.Context(), principal, courseID, page)
+	filter := ListFilter{Category: c.Query("category"), Tag: c.Query("tag"), Status: c.Query("status"), Search: c.Query("search")}
+	data, total, err := h.service.List(c.Request.Context(), principal, courseID, page, filter)
 	if err != nil {
 		response.FromError(c, err)
 		return

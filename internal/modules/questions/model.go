@@ -11,7 +11,9 @@ type Question struct {
 	Type          string `gorm:"size:32;not null"`
 	Stem          string `gorm:"type:text;not null"`
 	DefaultPoints float64
-	Status        string `gorm:"size:20;not null"`
+	Category      string   `gorm:"size:80"`
+	Tags          []string `gorm:"type:json;serializer:json"`
+	Status        string   `gorm:"size:20;not null"`
 	Version       uint
 	Options       []Option `gorm:"foreignKey:QuestionID"`
 	CreatedAt     time.Time

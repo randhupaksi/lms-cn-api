@@ -34,8 +34,20 @@ func (r *Repository) Find(ctx context.Context, id string) (Question, error) {
 	return question, err
 }
 
-func (r *Repository) List(ctx context.Context, courseID string, page pagination.Request) ([]Question, int64, error) {
+func (r *Repository) List(ctx context.Context, courseID string, page pagination.Request, filter ListFilter) ([]Question, int64, error) {
 	query := r.db.WithContext(ctx).Model(&Question{}).Where("course_id = ?", courseID)
+	if filter.Category != "" {
+		query = query.Where("category = ?", filter.Category)
+	}
+	if filter.Tag != "" {
+		query = query.Where("JSON_CONTAINS(tags, JSON_QUOTE(?))", filter.Tag)
+	}
+	if filter.Status != "" {
+		query = query.Where("status = ?", filter.Status)
+	}
+	if filter.Search != "" {
+		query = query.Where("stem LIKE ?", "%"+filter.Search+"%")
+	}
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
