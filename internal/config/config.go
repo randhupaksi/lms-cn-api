@@ -46,7 +46,7 @@ func Load() (*Config, error) {
 		MigrationsPath:         valueOrDefault("MIGRATIONS_PATH", "migrations"),
 		DatabaseURL:            strings.TrimSpace(os.Getenv("DATABASE_URL")),
 		JWTSecret:              strings.TrimSpace(os.Getenv("JWT_SECRET")),
-		AccessTokenTTL:         durationOrDefault("ACCESS_TOKEN_TTL", 15*time.Minute),
+		AccessTokenTTL:         durationOrDefault("ACCESS_TOKEN_TTL", 24*time.Hour),
 		RefreshTokenTTL:        durationOrDefault("REFRESH_TOKEN_TTL", 7*24*time.Hour),
 		AllowedOrigins:         csvOrDefault("ALLOWED_ORIGINS", []string{"http://localhost:3000"}),
 		CookieDomain:           strings.TrimSpace(os.Getenv("COOKIE_DOMAIN")),
