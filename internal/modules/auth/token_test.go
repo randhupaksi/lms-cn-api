@@ -8,7 +8,7 @@ import (
 )
 
 func TestAccessTokenRoundTrip(t *testing.T) {
-	now := time.Date(2026, time.September, 2, 8, 0, 0, 0, time.UTC)
+	now := time.Now().UTC().Truncate(time.Second)
 	manager := NewTokenManager("a-secret-that-is-long-enough-for-tests", "citra-negara-lms", 15*time.Minute)
 	want := authz.Principal{UserID: "user-1", SessionID: "session-1", Role: "student", MustChangePassword: true}
 
