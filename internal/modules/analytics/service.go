@@ -36,6 +36,10 @@ func (s *Service) Dashboard(ctx context.Context, actor authz.Principal) (Dashboa
 			{Key: "published_exams", Label: "Ujian published", Value: float64(counts.PublishedExams)},
 			{Key: "active_attempts", Label: "Attempt berlangsung", Value: float64(counts.ActiveAttempts)},
 		}
+		result.Tasks, err = s.repository.AdminDashboardTasks(ctx, now)
+		if err != nil {
+			return Dashboard{}, analyticsReadError(err)
+		}
 	case "teacher":
 		counts, err := s.repository.TeacherDashboardCounts(ctx, actor.UserID)
 		if err != nil {
@@ -47,6 +51,10 @@ func (s *Service) Dashboard(ctx context.Context, actor authz.Principal) (Dashboa
 			{Key: "exams", Label: "Ujian dikelola", Value: float64(counts.Exams)},
 			{Key: "unpublished_results", Label: "Hasil belum published", Value: float64(counts.UnpublishedResults)},
 		}
+		result.Tasks, err = s.repository.TeacherDashboardTasks(ctx, actor.UserID)
+		if err != nil {
+			return Dashboard{}, analyticsReadError(err)
+		}
 	case "student":
 		counts, err := s.repository.StudentDashboardCounts(ctx, actor.UserID, now)
 		if err != nil {
@@ -57,6 +65,10 @@ func (s *Service) Dashboard(ctx context.Context, actor authz.Principal) (Dashboa
 			{Key: "available_exams", Label: "Ujian tersedia", Value: float64(counts.AvailableExams)},
 			{Key: "published_results", Label: "Hasil tersedia", Value: float64(counts.PublishedResults)},
 			{Key: "completed_materials", Label: "Materi selesai", Value: float64(counts.CompletedMaterials)},
+		}
+		result.Tasks, err = s.repository.StudentDashboardTasks(ctx, actor.UserID, now)
+		if err != nil {
+			return Dashboard{}, analyticsReadError(err)
 		}
 	default:
 		return Dashboard{}, apperror.New(http.StatusForbidden, "ANALYTICS_ACCESS_DENIED", "Ringkasan tidak tersedia untuk akun ini")

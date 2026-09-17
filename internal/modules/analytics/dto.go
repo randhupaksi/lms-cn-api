@@ -1,5 +1,7 @@
 package analytics
 
+import "time"
+
 type Metric struct {
 	Key   string  `json:"key"`
 	Label string  `json:"label"`
@@ -7,8 +9,19 @@ type Metric struct {
 }
 
 type Dashboard struct {
-	Role    string   `json:"role"`
-	Metrics []Metric `json:"metrics"`
+	Role    string          `json:"role"`
+	Metrics []Metric        `json:"metrics"`
+	Tasks   []DashboardTask `json:"tasks"`
+}
+
+type DashboardTask struct {
+	ID          string     `json:"id"`
+	Kind        string     `json:"kind"`
+	Title       string     `json:"title"`
+	Context     string     `json:"context"`
+	Status      string     `json:"status"`
+	Count       int64      `json:"count"`
+	AttentionAt *time.Time `json:"attention_at"`
 }
 
 type ExamSummary struct {

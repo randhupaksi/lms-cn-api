@@ -105,6 +105,79 @@ func (r *Repository) StudentDashboardCounts(ctx context.Context, studentID strin
 	return counts, nil
 }
 
+func (r *Repository) StudentDashboardTasks(ctx context.Context, studentID string, now time.Time) ([]DashboardTask, error) {
+	var tasks []DashboardTask
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT a.id, 'assignment' AS kind, a.title, c.name AS context,
+			CASE WHEN a.due_at <= ? THEN 'overdue' ELSE 'pending' END AS status,
+			0 AS count, a.due_at AS attention_at
+		FROM assignments a
+		JOIN courses c ON c.id = a.course_id
+		JOIN course_students cs ON cs.course_id = a.course_id AND cs.student_id = ?
+		LEFT JOIN assignment_submissions s ON s.assignment_id = a.id AND s.student_id = ?
+		WHERE a.status = 'published' AND s.id IS NULL
+		UNION ALL
+		SELECT e.id, 'exam' AS kind, e.title, c.name AS context,
+			CASE
+				WHEN at.status = 'in_progress' THEN 'in_progress'
+				WHEN e.starts_at > ? THEN 'upcoming'
+				ELSE 'available'
+			END AS status,
+			0 AS count,
+			CASE WHEN e.starts_at > ? THEN e.starts_at ELSE e.ends_at END AS attention_at
+		FROM exams e
+		JOIN courses c ON c.id = e.course_id
+		JOIN exam_participants ep ON ep.exam_id = e.id AND ep.student_id = ?
+		LEFT JOIN attempts at ON at.exam_id = e.id AND at.student_id = ?
+		WHERE e.status = 'published' AND e.ends_at > ?
+			AND (at.id IS NULL OR at.status = 'in_progress')
+		ORDER BY attention_at ASC
+		LIMIT 6`, now, studentID, studentID, now, now, studentID, studentID, now).Scan(&tasks).Error
+	return tasks, err
+}
+
+func (r *Repository) TeacherDashboardTasks(ctx context.Context, teacherID string) ([]DashboardTask, error) {
+	var tasks []DashboardTask
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT a.id, 'grading' AS kind, a.title, c.name AS context,
+			'needs_grading' AS status, COUNT(s.id) AS count,
+			MAX(s.submitted_at) AS attention_at
+		FROM assignments a
+		JOIN courses c ON c.id = a.course_id
+		JOIN course_teachers ct ON ct.course_id = a.course_id AND ct.teacher_id = ?
+		JOIN assignment_submissions s ON s.assignment_id = a.id AND s.status = 'submitted'
+		GROUP BY a.id, a.title, c.name
+		UNION ALL
+		SELECT e.id, 'results' AS kind, e.title, c.name AS context,
+			'needs_publish' AS status, COUNT(r.id) AS count,
+			MAX(r.graded_at) AS attention_at
+		FROM exams e
+		JOIN courses c ON c.id = e.course_id
+		JOIN course_teachers ct ON ct.course_id = e.course_id AND ct.teacher_id = ?
+		JOIN results r ON r.exam_id = e.id AND r.status <> 'published'
+		GROUP BY e.id, e.title, c.name
+		ORDER BY attention_at DESC
+		LIMIT 6`, teacherID, teacherID).Scan(&tasks).Error
+	return tasks, err
+}
+
+func (r *Repository) AdminDashboardTasks(ctx context.Context, now time.Time) ([]DashboardTask, error) {
+	var tasks []DashboardTask
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT e.id, 'monitoring' AS kind, e.title, c.name AS context,
+			CASE WHEN e.starts_at <= ? THEN 'in_progress' ELSE 'upcoming' END AS status,
+			COUNT(CASE WHEN at.status = 'in_progress' THEN 1 END) AS count,
+			CASE WHEN e.starts_at > ? THEN e.starts_at ELSE e.ends_at END AS attention_at
+		FROM exams e
+		JOIN courses c ON c.id = e.course_id
+		LEFT JOIN attempts at ON at.exam_id = e.id
+		WHERE e.status = 'published' AND e.ends_at > ?
+		GROUP BY e.id, e.title, c.name, e.starts_at, e.ends_at
+		ORDER BY attention_at ASC
+		LIMIT 6`, now, now, now).Scan(&tasks).Error
+	return tasks, err
+}
+
 func (r *Repository) ExamSummary(ctx context.Context, examID string) (ExamSummary, error) {
 	var summary ExamSummary
 	summary.ExamID = examID
