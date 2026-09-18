@@ -36,7 +36,7 @@ func New(cfg *config.Config, db *gorm.DB) (*Engine, error) {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	engine := gin.New()
-	engine.Use(gin.Recovery(), middleware.RequestID(), middleware.RequestLogger(), middleware.CORS(cfg.AllowedOrigins), gzip.Gzip(gzip.DefaultCompression))
+	engine.Use(gin.Recovery(), middleware.RequestID(), middleware.RequestLogger(), middleware.SecurityHeaders(cfg.AppEnv == "production"), middleware.CORS(cfg.AllowedOrigins), gzip.Gzip(gzip.DefaultCompression))
 
 	auditService := audit.NewService(db)
 	usersRepository := users.NewRepository(db)

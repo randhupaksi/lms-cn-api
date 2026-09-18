@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -83,11 +84,35 @@ func (c *Config) validate() error {
 	if len(c.JWTSecret) < 32 {
 		return errors.New("JWT_SECRET must contain at least 32 characters")
 	}
-	if c.AppEnv == "production" && c.SeedDemoData {
-		return errors.New("SEED_DEMO_DATA must be false in production")
+	if c.RefreshTokenTTL <= c.AccessTokenTTL {
+		return errors.New("REFRESH_TOKEN_TTL must be greater than ACCESS_TOKEN_TTL")
+	}
+	if c.DatabaseMaxIdle > c.DatabaseMaxOpen {
+		return errors.New("DATABASE_MAX_IDLE must not exceed DATABASE_MAX_OPEN")
 	}
 	if !strings.HasPrefix(c.APIPrefix, "/") {
 		return errors.New("API_PREFIX must start with a slash")
+	}
+	if c.AppEnv == "production" {
+		if c.SeedDemoData {
+			return errors.New("SEED_DEMO_DATA must be false in production")
+		}
+		if !c.CookieSecure {
+			return errors.New("COOKIE_SECURE must be true in production")
+		}
+		if c.JWTSecret == "replace-with-a-long-random-secret" {
+			return errors.New("JWT_SECRET must not use the example value in production")
+		}
+		for _, origin := range c.AllowedOrigins {
+			parsed, err := url.ParseRequestURI(origin)
+			if err != nil || parsed.Scheme != "https" || parsed.Host == "" {
+				return fmt.Errorf("ALLOWED_ORIGINS must contain valid HTTPS origins in production: %q", origin)
+			}
+			hostname := strings.ToLower(parsed.Hostname())
+			if hostname == "localhost" || hostname == "127.0.0.1" || hostname == "::1" {
+				return fmt.Errorf("ALLOWED_ORIGINS must not contain local origins in production: %q", origin)
+			}
+		}
 	}
 	return nil
 }
