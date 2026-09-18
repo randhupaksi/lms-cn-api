@@ -1,0 +1,9 @@
+.git
+*.exe
+*.test
+.env
+.env.*
+!.env.example
+tmp
+storage
+backups

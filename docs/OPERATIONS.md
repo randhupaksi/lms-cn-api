@@ -16,6 +16,52 @@ replace infrastructure-specific procedures.
 5. Run the API and web validation commands documented in each repository.
 6. Verify `/api/v1/health/live` and `/api/v1/health` after deployment.
 
+Production startup fails fast when secure cookies are disabled, the example JWT
+secret is still configured, an allowed origin is not an HTTPS non-local origin,
+the refresh-token lifetime is not longer than the access-token lifetime, or the
+idle database pool exceeds the open-connection limit.
+
+## Container images
+
+Both repositories include multi-stage Dockerfiles and run as non-root users.
+Build images from their respective repository roots:
+
+```bash
+docker build -t citra-negara-lms-api:VERSION .
+docker build \
+  --build-arg NEXT_PUBLIC_API_BASE_URL=https://api.example.sch.id/api/v1 \
+  --build-arg NEXT_PUBLIC_APP_NAME="Citra Negara LMS" \
+  -t citra-negara-lms-web:VERSION .
+```
+
+`NEXT_PUBLIC_API_BASE_URL` is embedded in the browser bundle and is therefore
+required while building the web image. It is not a secret. Do not place JWT,
+database, or private infrastructure credentials in any `NEXT_PUBLIC_*` value.
+
+Supply API secrets and environment-specific configuration at runtime through
+the deployment platform. At minimum, production requires `DATABASE_URL`, a
+unique `JWT_SECRET`, `ALLOWED_ORIGINS`, and `COOKIE_SECURE=true`. Keep
+`SEED_DEMO_DATA=false`. The image healthcheck covers process liveness; the
+orchestrator readiness probe should use `/api/v1/health` so database failures
+stop new traffic.
+
+## Deployment and rollback sequence
+
+1. Record the image versions and create a verified database backup.
+2. Deploy the API image. Startup applies forward migrations before accepting
+   traffic; stop the rollout if migration or readiness fails.
+3. Verify liveness, readiness, structured logs, and one authenticated smoke
+   request without logging credentials or response data.
+4. Deploy the web image built for the intended public API origin.
+5. Complete the role-based smoke path before opening an examination window.
+
+For an application rollback, redeploy the previously recorded image only when
+its schema compatibility has been verified. Database down migrations are never
+run automatically. If a schema rollback is required, enter a maintenance
+window and follow the reviewed migration-specific recovery plan. Restoring a
+backup is a last-resort data operation and must target a separately verified
+database before traffic is resumed.
+
 ## Local development seed
 
 `go run ./cmd/api` automatically applies pending versioned migrations, then

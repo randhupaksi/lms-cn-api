@@ -7,9 +7,11 @@
 ## 1. Product and current scope
 
 This is the Go/Gin REST API for Citra Negara LMS. The current implementation is
-only a foundation with a health endpoint. Do not add authentication, users,
-exam management, grading, CRUD, or other business modules unless the task
-explicitly requests them and the product requirements are available.
+a modular monolith with authentication, users, academics, question and exam
+authoring, attempts, grading/results, monitoring/audit, materials, assignments,
+and analytics modules. Preserve their published contracts and consult
+`../docs/IMPLEMENTATION_STATUS.md` before extending product scope; do not add
+unconfirmed business modules.
 
 The API may process student identity, question banks, answers, scores, and
 results. These are confidential. Security and authorization are enforced by
@@ -25,7 +27,7 @@ multi-tenant, platform-superadmin, or white-label abstractions speculatively.
 | Language | Go 1.25.5 |
 | HTTP framework | Gin |
 | Persistence | GORM + MySQL |
-| Auth | JWT when the auth module is introduced |
+| Auth | JWT access tokens + rotating opaque refresh sessions |
 | Validation | go-playground/validator |
 | Module | `lms-cn-api` |
 | API prefix | `/api/v1` from configuration |
@@ -105,8 +107,8 @@ columns exist.
   are introduced.
 - Prefer versioned migrations for persistent schema changes. Do not enable
   destructive schema synchronization in production.
-- Sensitive operations such as final exam submission must be idempotent and
-  server-validated when the exam domain is introduced.
+- Sensitive operations such as answer persistence and final exam submission
+  must remain idempotent and server-validated.
 
 ## 7. Module workflow
 
@@ -136,8 +138,8 @@ stable pattern. Favor explicit code while the domain is still being discovered.
 
 ## 9. Do not touch without explicit need
 
-- Do not change the API contract or add business modules during foundation-only
-  work.
+- Do not change established API contracts or expand business scope as a side
+  effect of maintenance.
 - Do not bypass the response package or validation boundary.
 - Do not expose raw model structs containing secrets or PII.
 - Do not introduce `synchronize: true`-style destructive production behavior.

@@ -14,7 +14,8 @@ Summary:
 
 - Go 1.25.5 + Gin + GORM/MySQL.
 - Pragmatic modular monolith: handler → service → repository.
-- Current API is foundation-only with a health endpoint.
+- Implemented modules cover auth, users, academics, examinations, grading,
+  results, monitoring/audit, materials, assignments, and analytics.
 - Student and examination data are confidential.
 - Validate ownership and authorization in the API.
 - Before handoff: vet, test, build. Never commit or push.

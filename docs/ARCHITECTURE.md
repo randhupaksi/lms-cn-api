@@ -1,7 +1,8 @@
 # Citra Negara LMS API Architecture
 
-Citra Negara LMS API uses a pragmatic modular monolith. It keeps deployment simple while
-giving each future business domain a clear ownership boundary.
+Citra Negara LMS API uses a pragmatic modular monolith. It keeps deployment
+simple while giving each implemented business domain a clear ownership
+boundary.
 
 ```text
 cmd/api/             # executable composition root
