@@ -24,10 +24,6 @@ func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
 
 func (h *Handler) list(c *gin.Context) {
 	courseID := c.Query("course_id")
-	if courseID == "" {
-		response.Error(c, http.StatusBadRequest, "COURSE_ID_REQUIRED", "Course wajib dipilih")
-		return
-	}
 	principal, _ := middleware.Principal(c)
 	page := pagination.FromContext(c)
 	filter := ListFilter{Category: c.Query("category"), Tag: c.Query("tag"), Status: c.Query("status"), Search: c.Query("search")}

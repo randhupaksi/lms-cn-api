@@ -34,8 +34,14 @@ func (r *Repository) Find(ctx context.Context, id string) (Question, error) {
 	return question, err
 }
 
-func (r *Repository) List(ctx context.Context, courseID string, page pagination.Request, filter ListFilter) ([]Question, int64, error) {
+func (r *Repository) List(ctx context.Context, courseID string, page pagination.Request, filter ListFilter, scope ...string) ([]Question, int64, error) {
 	query := r.db.WithContext(ctx).Model(&Question{}).Where("course_id = ?", courseID)
+	if courseID == "" {
+		query = r.db.WithContext(ctx).Model(&Question{})
+		if len(scope) >= 2 && scope[0] == "teacher" {
+			query = query.Joins("JOIN course_teachers ct ON ct.course_id = questions.course_id AND ct.teacher_id = ?", scope[1])
+		}
+	}
 	if filter.Category != "" {
 		query = query.Where("category = ?", filter.Category)
 	}

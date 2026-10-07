@@ -51,7 +51,11 @@ func (s *Service) Create(ctx context.Context, actor authz.Principal, request Wri
 }
 
 func (s *Service) List(ctx context.Context, actor authz.Principal, courseID string, page pagination.Request, filter ListFilter) ([]Response, int64, error) {
-	if err := s.academics.RequireCourseManager(ctx, actor, courseID); err != nil {
+	if courseID != "" {
+		if err := s.academics.RequireCourseManager(ctx, actor, courseID); err != nil {
+			return nil, 0, err
+		}
+	} else if err := actor.RequireRole(string(users.RoleAdmin), string(users.RoleTeacher)); err != nil {
 		return nil, 0, err
 	}
 	filter.Category = strings.TrimSpace(filter.Category)
@@ -60,7 +64,7 @@ func (s *Service) List(ctx context.Context, actor authz.Principal, courseID stri
 	if filter.Status != "" && filter.Status != "active" && filter.Status != "archived" {
 		return nil, 0, apperror.New(http.StatusBadRequest, "QUESTION_STATUS_INVALID", "Status soal tidak valid")
 	}
-	values, total, err := s.repository.List(ctx, courseID, page, filter)
+	values, total, err := s.repository.List(ctx, courseID, page, filter, actor.Role, actor.UserID)
 	if err != nil {
 		return nil, 0, apperror.Wrap(http.StatusInternalServerError, "QUESTIONS_READ_FAILED", "Gagal memuat bank soal", err)
 	}
