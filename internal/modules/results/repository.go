@@ -3,6 +3,7 @@ package results
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"lms-cn-api/internal/modules/exams"
@@ -39,6 +40,34 @@ func (r *Repository) ListByExam(ctx context.Context, examID string, page paginat
 	return rows, total, err
 }
 
+func (r *Repository) ListScoped(ctx context.Context, role, userID string, filter ListFilter, page pagination.Request) ([]resultRow, int64, error) {
+	query := r.db.WithContext(ctx).Table("results r").
+		Joins("JOIN exams e ON e.id = r.exam_id").
+		Joins("JOIN courses c ON c.id = e.course_id").
+		Joins("JOIN users u ON u.id = r.student_id")
+	if role == "teacher" {
+		query = query.Joins("JOIN course_teachers ct ON ct.course_id = e.course_id AND ct.teacher_id = ?", userID)
+	}
+	if filter.CourseID != "" {
+		query = query.Where("e.course_id = ?", filter.CourseID)
+	}
+	if filter.ExamID != "" {
+		query = query.Where("r.exam_id = ?", filter.ExamID)
+	}
+	if filter.Search != "" {
+		pattern := "%" + strings.TrimSpace(filter.Search) + "%"
+		query = query.Where("e.title LIKE ? OR u.full_name LIKE ? OR u.identifier LIKE ?", pattern, pattern, pattern)
+	}
+	var total int64
+	if err := query.Session(&gorm.Session{}).Distinct("r.id").Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var rows []resultRow
+	err := query.Select("r.*, e.title AS exam_title, e.course_id AS course_id, c.name AS course_name, u.full_name AS student_name, u.identifier").
+		Order("c.name ASC, e.title ASC, u.full_name ASC").Offset(page.Offset()).Limit(page.PerPage).Scan(&rows).Error
+	return rows, total, err
+}
+
 func (r *Repository) ExportByExam(ctx context.Context, examID string) ([]resultRow, error) {
 	var rows []resultRow
 	err := r.db.WithContext(ctx).Table("results r").
@@ -53,14 +82,21 @@ func (r *Repository) PublishByExam(ctx context.Context, examID string, now time.
 	return result.RowsAffected, result.Error
 }
 
-func (r *Repository) ListPublishedForStudent(ctx context.Context, studentID string, page pagination.Request) ([]resultRow, int64, error) {
-	query := r.db.WithContext(ctx).Table("results r").Where("r.student_id = ? AND r.status = 'published'", studentID)
+func (r *Repository) ListPublishedForStudent(ctx context.Context, studentID string, page pagination.Request, searches ...string) ([]resultRow, int64, error) {
+	query := r.db.WithContext(ctx).Table("results r").
+		Joins("JOIN exams e ON e.id = r.exam_id").
+		Joins("JOIN courses c ON c.id = e.course_id").
+		Where("r.student_id = ? AND r.status = 'published'", studentID)
+	if len(searches) > 0 && strings.TrimSpace(searches[0]) != "" {
+		pattern := "%" + strings.TrimSpace(searches[0]) + "%"
+		query = query.Where("e.title LIKE ? OR c.name LIKE ?", pattern, pattern)
+	}
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 	var rows []resultRow
-	err := query.Select("r.*, e.title AS exam_title").Joins("JOIN exams e ON e.id = r.exam_id").
+	err := query.Select("r.*, e.title AS exam_title, e.course_id AS course_id, c.name AS course_name").
 		Order("r.published_at DESC").Offset(page.Offset()).Limit(page.PerPage).Scan(&rows).Error
 	return rows, total, err
 }

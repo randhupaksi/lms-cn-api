@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"lms-cn-api/internal/authz"
@@ -40,6 +41,38 @@ func (s *Service) ListByExam(ctx context.Context, actor authz.Principal, examID 
 	result := make([]Response, len(rows))
 	for i, row := range rows {
 		result[i] = toResponse(row, true)
+	}
+	return result, total, nil
+}
+
+func (s *Service) ListScoped(ctx context.Context, actor authz.Principal, filter ListFilter, page pagination.Request) ([]Response, int64, error) {
+	if err := actor.RequireRole(string(users.RoleAdmin), string(users.RoleTeacher)); err != nil {
+		return nil, 0, err
+	}
+	if filter.ExamID != "" {
+		courseID, err := s.repository.ExamCourseID(ctx, filter.ExamID)
+		if err != nil {
+			return nil, 0, mapResultError(err)
+		}
+		if filter.CourseID != "" && filter.CourseID != courseID {
+			return nil, 0, apperror.New(http.StatusBadRequest, "RESULT_SCOPE_INVALID", "Ujian tidak termasuk dalam course yang dipilih")
+		}
+		if err := s.academics.RequireCourseManager(ctx, actor, courseID); err != nil {
+			return nil, 0, err
+		}
+	} else if filter.CourseID != "" {
+		if err := s.academics.RequireCourseManager(ctx, actor, filter.CourseID); err != nil {
+			return nil, 0, err
+		}
+	}
+	filter.Search = strings.TrimSpace(filter.Search)
+	rows, total, err := s.repository.ListScoped(ctx, actor.Role, actor.UserID, filter, page)
+	if err != nil {
+		return nil, 0, mapResultError(err)
+	}
+	result := make([]Response, len(rows))
+	for index, row := range rows {
+		result[index] = toResponse(row, true)
 	}
 	return result, total, nil
 }
@@ -82,11 +115,15 @@ func (s *Service) PublishByExam(ctx context.Context, actor authz.Principal, exam
 	return count, nil
 }
 
-func (s *Service) ListStudent(ctx context.Context, actor authz.Principal, page pagination.Request) ([]Response, int64, error) {
+func (s *Service) ListStudent(ctx context.Context, actor authz.Principal, page pagination.Request, searches ...string) ([]Response, int64, error) {
 	if actor.Role != string(users.RoleStudent) {
 		return nil, 0, apperror.New(http.StatusForbidden, "STUDENT_ONLY", "Hasil ini hanya tersedia untuk siswa")
 	}
-	rows, total, err := s.repository.ListPublishedForStudent(ctx, actor.UserID, page)
+	search := ""
+	if len(searches) > 0 {
+		search = strings.TrimSpace(searches[0])
+	}
+	rows, total, err := s.repository.ListPublishedForStudent(ctx, actor.UserID, page, search)
 	if err != nil {
 		return nil, 0, mapResultError(err)
 	}

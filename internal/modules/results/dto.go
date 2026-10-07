@@ -2,11 +2,19 @@ package results
 
 import "time"
 
+type ListFilter struct {
+	CourseID string
+	ExamID   string
+	Search   string
+}
+
 type Response struct {
 	ID          string     `json:"id"`
 	AttemptID   string     `json:"attempt_id"`
 	ExamID      string     `json:"exam_id"`
 	ExamTitle   string     `json:"exam_title"`
+	CourseID    string     `json:"course_id,omitempty"`
+	CourseName  string     `json:"course_name,omitempty"`
 	StudentID   string     `json:"student_id"`
 	StudentName string     `json:"student_name,omitempty"`
 	Identifier  string     `json:"identifier,omitempty"`
@@ -21,6 +29,8 @@ type Response struct {
 type resultRow struct {
 	Result
 	ExamTitle   string
+	CourseID    string
+	CourseName  string
 	StudentName string
 	Identifier  string
 }
@@ -30,7 +40,7 @@ func toResponse(row resultRow, includeStudentIdentity bool) Response {
 	if row.MaxScore > 0 {
 		percentage = row.Score / row.MaxScore * 100
 	}
-	result := Response{ID: row.ID, AttemptID: row.AttemptID, ExamID: row.ExamID, ExamTitle: row.ExamTitle, StudentID: row.StudentID, Status: row.Status, Score: row.Score, MaxScore: row.MaxScore, Percentage: percentage, GradedAt: row.GradedAt, PublishedAt: row.PublishedAt}
+	result := Response{ID: row.ID, AttemptID: row.AttemptID, ExamID: row.ExamID, ExamTitle: row.ExamTitle, CourseID: row.CourseID, CourseName: row.CourseName, StudentID: row.StudentID, Status: row.Status, Score: row.Score, MaxScore: row.MaxScore, Percentage: percentage, GradedAt: row.GradedAt, PublishedAt: row.PublishedAt}
 	if includeStudentIdentity {
 		result.StudentName = row.StudentName
 		result.Identifier = row.Identifier

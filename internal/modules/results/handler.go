@@ -62,13 +62,10 @@ func (h *Handler) RegisterStudentRoutes(group *gin.RouterGroup) {
 
 func (h *Handler) listByExam(c *gin.Context) {
 	examID := c.Query("exam_id")
-	if examID == "" {
-		response.Error(c, http.StatusBadRequest, "EXAM_ID_REQUIRED", "Ujian wajib dipilih")
-		return
-	}
 	principal, _ := middleware.Principal(c)
 	page := pagination.FromContext(c)
-	data, total, err := h.service.ListByExam(c.Request.Context(), principal, examID, page)
+	filter := ListFilter{ExamID: examID, CourseID: c.Query("course_id"), Search: c.Query("search")}
+	data, total, err := h.service.ListScoped(c.Request.Context(), principal, filter, page)
 	if err != nil {
 		response.FromError(c, err)
 		return
@@ -94,7 +91,7 @@ func (h *Handler) publishByExam(c *gin.Context) {
 func (h *Handler) listStudent(c *gin.Context) {
 	principal, _ := middleware.Principal(c)
 	page := pagination.FromContext(c)
-	data, total, err := h.service.ListStudent(c.Request.Context(), principal, page)
+	data, total, err := h.service.ListStudent(c.Request.Context(), principal, page, c.Query("search"))
 	if err != nil {
 		response.FromError(c, err)
 		return
