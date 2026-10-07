@@ -2,6 +2,11 @@ package materials
 
 import "time"
 
+type ListFilter struct {
+	Search string
+	Status string
+}
+
 type WriteRequest struct {
 	CourseID    string `json:"course_id" binding:"required"`
 	Title       string `json:"title" binding:"required,max=180"`
@@ -13,6 +18,7 @@ type WriteRequest struct {
 type Response struct {
 	ID          string     `json:"id"`
 	CourseID    string     `json:"course_id"`
+	CourseName  string     `json:"course_name"`
 	AuthorID    string     `json:"author_id"`
 	Title       string     `json:"title"`
 	Description string     `json:"description"`
@@ -27,9 +33,10 @@ type Response struct {
 
 type materialRow struct {
 	Material
+	CourseName  string
 	CompletedAt *time.Time
 }
 
 func toResponse(row materialRow) Response {
-	return Response{ID: row.ID, CourseID: row.CourseID, AuthorID: row.AuthorID, Title: row.Title, Description: row.Description, Content: row.Content, Position: row.Position, Status: row.Status, PublishedAt: row.PublishedAt, CompletedAt: row.CompletedAt, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+	return Response{ID: row.ID, CourseID: row.CourseID, CourseName: row.CourseName, AuthorID: row.AuthorID, Title: row.Title, Description: row.Description, Content: row.Content, Position: row.Position, Status: row.Status, PublishedAt: row.PublishedAt, CompletedAt: row.CompletedAt, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
 }

@@ -10,7 +10,9 @@ import (
 	"lms-cn-api/internal/authz"
 	"lms-cn-api/internal/modules/academics"
 	"lms-cn-api/internal/modules/audit"
+	"lms-cn-api/internal/modules/users"
 	"lms-cn-api/pkg/apperror"
+	"lms-cn-api/pkg/pagination"
 
 	"github.com/google/uuid"
 )
@@ -46,6 +48,36 @@ func (s *Service) List(ctx context.Context, actor authz.Principal, courseID stri
 		result[index] = toResponse(row)
 	}
 	return result, nil
+}
+
+func (s *Service) ListPaged(ctx context.Context, actor authz.Principal, courseID string, page pagination.Request, filter ListFilter) ([]Response, int64, error) {
+	if courseID != "" {
+		if actor.Role == string(users.RoleStudent) {
+			if err := s.academics.RequireCourseStudent(ctx, actor, courseID); err != nil {
+				return nil, 0, err
+			}
+		} else if err := s.academics.RequireCourseManager(ctx, actor, courseID); err != nil {
+			return nil, 0, err
+		}
+	} else if err := actor.RequireRole(string(users.RoleAdmin), string(users.RoleTeacher), string(users.RoleStudent)); err != nil {
+		return nil, 0, err
+	}
+	filter.Search = strings.TrimSpace(filter.Search)
+	if filter.Status != "" && filter.Status != StatusDraft && filter.Status != StatusPublished {
+		return nil, 0, apperror.New(http.StatusBadRequest, "MATERIAL_STATUS_INVALID", "Status materi tidak valid")
+	}
+	if actor.Role == string(users.RoleStudent) && filter.Status != "" && filter.Status != StatusPublished {
+		return nil, 0, apperror.New(http.StatusBadRequest, "MATERIAL_STATUS_INVALID", "Status materi tidak valid")
+	}
+	rows, total, err := s.repository.ListPaged(ctx, courseID, actor.Role, actor.UserID, page, filter)
+	if err != nil {
+		return nil, 0, apperror.Wrap(http.StatusInternalServerError, "MATERIALS_READ_FAILED", "Gagal memuat materi", err)
+	}
+	result := make([]Response, len(rows))
+	for index, row := range rows {
+		result[index] = toResponse(row)
+	}
+	return result, total, nil
 }
 
 func (s *Service) Create(ctx context.Context, actor authz.Principal, request WriteRequest) (Response, error) {

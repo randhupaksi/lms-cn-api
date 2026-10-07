@@ -6,6 +6,7 @@ import (
 
 	"lms-cn-api/internal/authz"
 	"lms-cn-api/internal/middleware"
+	"lms-cn-api/pkg/pagination"
 	"lms-cn-api/pkg/request"
 	"lms-cn-api/pkg/response"
 
@@ -26,13 +27,15 @@ func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
 
 func (h *Handler) list(c *gin.Context) {
 	courseID := c.Query("course_id")
-	if courseID == "" {
-		response.Error(c, http.StatusBadRequest, "COURSE_ID_REQUIRED", "Course wajib dipilih")
+	principal, _ := middleware.Principal(c)
+	page := pagination.FromContext(c)
+	filter := ListFilter{Search: c.Query("search"), Status: c.Query("status")}
+	data, total, err := h.service.ListPaged(c.Request.Context(), principal, courseID, page, filter)
+	if err != nil {
+		response.FromError(c, err)
 		return
 	}
-	principal, _ := middleware.Principal(c)
-	data, err := h.service.List(c.Request.Context(), principal, courseID)
-	respond(c, http.StatusOK, "Materi berhasil dimuat", data, err)
+	response.SuccessWithMeta(c, http.StatusOK, "Materi berhasil dimuat", data, page.Meta(total))
 }
 
 func (h *Handler) create(c *gin.Context) { h.write(c, true) }

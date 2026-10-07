@@ -3,7 +3,10 @@ package materials
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
+
+	"lms-cn-api/pkg/pagination"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -45,6 +48,42 @@ func (r *Repository) List(ctx context.Context, courseID, studentID string, publi
 	var rows []materialRow
 	err := query.Order("m.position ASC, m.created_at ASC").Scan(&rows).Error
 	return rows, err
+}
+
+func (r *Repository) ListPaged(ctx context.Context, courseID, role, userID string, page pagination.Request, filter ListFilter) ([]materialRow, int64, error) {
+	query := r.db.WithContext(ctx).Table("course_materials m").
+		Select("m.*, c.name AS course_name").
+		Joins("JOIN courses c ON c.id = m.course_id")
+	switch role {
+	case "teacher":
+		query = query.Joins("JOIN course_teachers ct ON ct.course_id = m.course_id AND ct.teacher_id = ?", userID)
+	case "student":
+		query = query.Joins("JOIN course_students cs ON cs.course_id = m.course_id AND cs.student_id = ?", userID).
+			Select("m.*, c.name AS course_name, mp.completed_at").
+			Joins("LEFT JOIN material_progress mp ON mp.material_id = m.id AND mp.student_id = ?", userID).
+			Where("m.status = ?", StatusPublished)
+	case "admin":
+	default:
+		return nil, 0, errors.New("unsupported material list role")
+	}
+	if courseID != "" {
+		query = query.Where("m.course_id = ?", courseID)
+	}
+	if filter.Search != "" {
+		pattern := "%" + strings.TrimSpace(filter.Search) + "%"
+		query = query.Where("m.title LIKE ? OR m.description LIKE ?", pattern, pattern)
+	}
+	if filter.Status != "" {
+		query = query.Where("m.status = ?", filter.Status)
+	}
+	var total int64
+	if err := query.Session(&gorm.Session{}).Distinct("m.id").Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var rows []materialRow
+	err := query.Order("c.name ASC, m.position ASC, m.created_at ASC").
+		Offset(page.Offset()).Limit(page.PerPage).Scan(&rows).Error
+	return rows, total, err
 }
 
 func (r *Repository) UpdateDraft(ctx context.Context, id string, apply func(*Material)) (Material, error) {
