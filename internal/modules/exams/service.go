@@ -53,11 +53,23 @@ func (s *Service) Create(ctx context.Context, actor authz.Principal, request Wri
 	return toResponse(exam, 0, false), nil
 }
 
-func (s *Service) List(ctx context.Context, actor authz.Principal, courseID string, page pagination.Request) ([]Response, int64, error) {
-	if err := s.academics.RequireCourseManager(ctx, actor, courseID); err != nil {
+func (s *Service) List(ctx context.Context, actor authz.Principal, courseID string, page pagination.Request, filters ...ListFilter) ([]Response, int64, error) {
+	if courseID != "" {
+		if err := s.academics.RequireCourseManager(ctx, actor, courseID); err != nil {
+			return nil, 0, err
+		}
+	} else if err := actor.RequireRole(string(users.RoleAdmin), string(users.RoleTeacher)); err != nil {
 		return nil, 0, err
 	}
-	values, counts, total, err := s.repository.List(ctx, courseID, page)
+	filter := ListFilter{Role: actor.Role, UserID: actor.UserID}
+	if len(filters) > 0 {
+		filter.Search = strings.TrimSpace(filters[0].Search)
+		filter.Status = strings.TrimSpace(filters[0].Status)
+	}
+	if filter.Status != "" && filter.Status != string(StatusDraft) && filter.Status != string(StatusPublished) {
+		return nil, 0, apperror.New(http.StatusBadRequest, "EXAM_STATUS_INVALID", "Status ujian tidak valid")
+	}
+	values, counts, total, err := s.repository.List(ctx, courseID, page, filter)
 	if err != nil {
 		return nil, 0, apperror.Wrap(http.StatusInternalServerError, "EXAMS_READ_FAILED", "Gagal memuat ujian", err)
 	}

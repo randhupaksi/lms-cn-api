@@ -2,6 +2,13 @@ package exams
 
 import "time"
 
+type ListFilter struct {
+	Search string
+	Status string
+	Role   string
+	UserID string
+}
+
 type WriteRequest struct {
 	CourseID            string    `json:"course_id" binding:"required"`
 	Title               string    `json:"title" binding:"required,max=180"`

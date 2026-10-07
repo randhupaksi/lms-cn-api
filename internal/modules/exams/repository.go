@@ -47,8 +47,22 @@ func (r *Repository) ParticipantIDs(ctx context.Context, examID string) ([]strin
 	return ids, err
 }
 
-func (r *Repository) List(ctx context.Context, courseID string, page pagination.Request) ([]Exam, map[string]int64, int64, error) {
-	query := r.db.WithContext(ctx).Model(&Exam{}).Where("course_id = ?", courseID)
+func (r *Repository) List(ctx context.Context, courseID string, page pagination.Request, filters ...ListFilter) ([]Exam, map[string]int64, int64, error) {
+	query := r.db.WithContext(ctx).Model(&Exam{})
+	if courseID != "" {
+		query = query.Where("course_id = ?", courseID)
+	} else if len(filters) > 0 && filters[0].Role == "teacher" {
+		query = query.Joins("JOIN course_teachers ct ON ct.course_id = exams.course_id AND ct.teacher_id = ?", filters[0].UserID)
+	}
+	if len(filters) > 0 {
+		filter := filters[0]
+		if filter.Search != "" {
+			query = query.Where("title LIKE ?", "%"+filter.Search+"%")
+		}
+		if filter.Status != "" {
+			query = query.Where("status = ?", filter.Status)
+		}
+	}
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
 		return nil, nil, 0, err
