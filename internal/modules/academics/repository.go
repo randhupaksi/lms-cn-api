@@ -3,6 +3,7 @@ package academics
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"lms-cn-api/internal/modules/users"
 	"lms-cn-api/pkg/pagination"
@@ -60,13 +61,18 @@ func (r *Repository) FindCourse(ctx context.Context, id string) (Course, error) 
 	return value, err
 }
 
-func (r *Repository) ListCourses(ctx context.Context, principalRole, userID string, page pagination.Request) ([]Course, int64, error) {
+func (r *Repository) ListCourses(ctx context.Context, principalRole, userID string, page pagination.Request, searches ...string) ([]Course, int64, error) {
 	query := r.db.WithContext(ctx).Model(&Course{})
 	switch principalRole {
 	case string(users.RoleTeacher):
 		query = query.Joins("JOIN course_teachers ct ON ct.course_id = courses.id AND ct.teacher_id = ?", userID)
 	case string(users.RoleStudent):
 		query = query.Joins("JOIN course_students cs ON cs.course_id = courses.id AND cs.student_id = ?", userID)
+	}
+	if len(searches) > 0 && strings.TrimSpace(searches[0]) != "" {
+		pattern := "%" + strings.TrimSpace(searches[0]) + "%"
+		query = query.Joins("JOIN subjects s ON s.id = courses.subject_id").
+			Where("courses.name LIKE ? OR s.name LIKE ? OR s.code LIKE ?", pattern, pattern, pattern)
 	}
 	var total int64
 	if err := query.Session(&gorm.Session{}).

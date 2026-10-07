@@ -93,7 +93,7 @@ func (h *Handler) createSubject(c *gin.Context) {
 func (h *Handler) listCourses(c *gin.Context) {
 	principal, _ := middleware.Principal(c)
 	page := pagination.FromContext(c)
-	data, total, err := h.service.ListCourses(c.Request.Context(), principal, page)
+	data, total, err := h.service.ListCourses(c.Request.Context(), principal, page, c.Query("search"))
 	if err != nil {
 		response.FromError(c, err)
 		return

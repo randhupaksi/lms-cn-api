@@ -128,8 +128,8 @@ func (s *Service) CreateCourse(ctx context.Context, actor authz.Principal, reque
 	return toCourseResponse(created), nil
 }
 
-func (s *Service) ListCourses(ctx context.Context, actor authz.Principal, page pagination.Request) ([]CourseResponse, int64, error) {
-	values, total, err := s.repository.ListCourses(ctx, actor.Role, actor.UserID, page)
+func (s *Service) ListCourses(ctx context.Context, actor authz.Principal, page pagination.Request, searches ...string) ([]CourseResponse, int64, error) {
+	values, total, err := s.repository.ListCourses(ctx, actor.Role, actor.UserID, page, searches...)
 	if err != nil {
 		return nil, 0, internalReadError(err)
 	}
