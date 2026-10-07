@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"lms-cn-api/internal/middleware"
+	"lms-cn-api/pkg/pagination"
 	"lms-cn-api/pkg/request"
 	"lms-cn-api/pkg/response"
 
@@ -25,10 +26,11 @@ func (h *Handler) examStatus(c *gin.Context) {
 		return
 	}
 	principal, _ := middleware.Principal(c)
-	data, err := h.service.ExamStatus(c.Request.Context(), principal, examID)
+	page := pagination.FromContext(c)
+	data, total, err := h.service.ExamStatusPage(c.Request.Context(), principal, examID, c.Query("search"), page)
 	if err != nil {
 		response.FromError(c, err)
 		return
 	}
-	response.Success(c, http.StatusOK, "Monitoring ujian berhasil dimuat", data)
+	response.SuccessWithMeta(c, http.StatusOK, "Monitoring ujian berhasil dimuat", data, page.Meta(total))
 }
