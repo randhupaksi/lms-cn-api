@@ -2,6 +2,11 @@ package assignments
 
 import "time"
 
+type ListFilter struct {
+	Search string
+	Status string
+}
+
 type WriteRequest struct {
 	CourseID     string    `json:"course_id" binding:"required"`
 	Title        string    `json:"title" binding:"required,max=180"`
@@ -23,6 +28,7 @@ type GradeRequest struct {
 type Response struct {
 	ID           string              `json:"id"`
 	CourseID     string              `json:"course_id"`
+	CourseName   string              `json:"course_name"`
 	AuthorID     string              `json:"author_id"`
 	Title        string              `json:"title"`
 	Instructions string              `json:"instructions"`
@@ -52,6 +58,7 @@ type SubmissionResponse struct {
 
 type assignmentRow struct {
 	Assignment
+	CourseName              string
 	SubmissionID            *string
 	SubmissionStudentID     *string
 	SubmissionContent       *string
@@ -70,7 +77,7 @@ type submissionRow struct {
 }
 
 func toResponse(row assignmentRow) Response {
-	result := Response{ID: row.ID, CourseID: row.CourseID, AuthorID: row.AuthorID, Title: row.Title, Instructions: row.Instructions, DueAt: row.DueAt, MaxScore: row.MaxScore, Status: row.Status, PublishedAt: row.PublishedAt, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+	result := Response{ID: row.ID, CourseID: row.CourseID, CourseName: row.CourseName, AuthorID: row.AuthorID, Title: row.Title, Instructions: row.Instructions, DueAt: row.DueAt, MaxScore: row.MaxScore, Status: row.Status, PublishedAt: row.PublishedAt, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
 	if row.SubmissionID != nil && row.SubmissionSubmittedAt != nil {
 		result.Submission = &SubmissionResponse{ID: *row.SubmissionID, AssignmentID: row.ID, StudentID: value(row.SubmissionStudentID), Content: value(row.SubmissionContent), AttachmentURL: value(row.SubmissionAttachmentURL), Status: value(row.SubmissionStatus), Score: row.SubmissionScore, Feedback: value(row.SubmissionFeedback), SubmittedAt: *row.SubmissionSubmittedAt, GradedAt: row.SubmissionGradedAt}
 	}
