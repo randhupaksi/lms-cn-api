@@ -33,8 +33,8 @@ func (s *Service) Dashboard(ctx context.Context, actor authz.Principal) (Dashboa
 		result.Metrics = []Metric{
 			{Key: "active_users", Label: "Pengguna aktif", Value: float64(counts.ActiveUsers)},
 			{Key: "active_courses", Label: "Course aktif", Value: float64(counts.ActiveCourses)},
-			{Key: "published_exams", Label: "Ujian published", Value: float64(counts.PublishedExams)},
-			{Key: "active_attempts", Label: "Attempt berlangsung", Value: float64(counts.ActiveAttempts)},
+			{Key: "published_exams", Label: "Ujian dipublikasikan", Value: float64(counts.PublishedExams)},
+			{Key: "active_attempts", Label: "Sesi berlangsung", Value: float64(counts.ActiveAttempts)},
 		}
 		result.Tasks, err = s.repository.AdminDashboardTasks(ctx, now)
 		if err != nil {
@@ -49,7 +49,7 @@ func (s *Service) Dashboard(ctx context.Context, actor authz.Principal) (Dashboa
 			{Key: "courses", Label: "Course saya", Value: float64(counts.Courses)},
 			{Key: "questions", Label: "Bank soal", Value: float64(counts.Questions)},
 			{Key: "exams", Label: "Ujian dikelola", Value: float64(counts.Exams)},
-			{Key: "unpublished_results", Label: "Hasil belum published", Value: float64(counts.UnpublishedResults)},
+			{Key: "unpublished_results", Label: "Hasil belum dipublikasikan", Value: float64(counts.UnpublishedResults)},
 		}
 		result.Tasks, err = s.repository.TeacherDashboardTasks(ctx, actor.UserID)
 		if err != nil {

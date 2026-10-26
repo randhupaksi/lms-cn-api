@@ -62,6 +62,11 @@ inside each repository; services coordinate authorization and business rules.
 
 ## Conventions
 
+Dashboard charts use the additive, read-only analytics insights endpoint.
+Its repository owns school-time aggregation and membership-scoped queries;
+its service shapes the bounded date series and whitelisted response. See
+[DASHBOARD_INSIGHTS.md](DASHBOARD_INSIGHTS.md) for scope and field semantics.
+
 - Use lowercase Go package names and descriptive file names in snake_case.
 - Return the shared response envelope from HTTP handlers.
 - Pass `context.Context` through I/O and service boundaries.

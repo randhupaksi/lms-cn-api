@@ -16,7 +16,14 @@ func NewHandler(service *Service) *Handler { return &Handler{service: service} }
 
 func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
 	group.GET("/dashboard", h.dashboard)
+	group.GET("/dashboard/insights", h.insights)
 	group.GET("/exams/:examID", h.exam)
+}
+
+func (h *Handler) insights(c *gin.Context) {
+	principal, _ := middleware.Principal(c)
+	data, err := h.service.DashboardInsights(c.Request.Context(), principal)
+	h.respond(c, "Analisis dashboard berhasil dimuat", data, err)
 }
 
 func (h *Handler) dashboard(c *gin.Context) {
