@@ -61,7 +61,7 @@ func Load() (*Config, error) {
 		LoginAccountRateLimit:  intOrDefault("LOGIN_ACCOUNT_RATE_LIMIT", 10),
 		LoginAccountRateWindow: durationOrDefault("LOGIN_ACCOUNT_RATE_WINDOW", 5*time.Minute),
 	}
-	cfg.SeedDemoData = boolOrDefault("SEED_DEMO_DATA", cfg.AppEnv != "production")
+	cfg.SeedDemoData = boolOrDefault("SEED_DEMO_DATA", cfg.AppEnv == "development")
 
 	if err := cfg.validate(); err != nil {
 		return nil, err
@@ -113,6 +113,8 @@ func (c *Config) validate() error {
 				return fmt.Errorf("ALLOWED_ORIGINS must not contain local origins in production: %q", origin)
 			}
 		}
+	} else if c.SeedDemoData && c.AppEnv != "development" {
+		return errors.New("SEED_DEMO_DATA is only allowed when APP_ENV=development")
 	}
 	return nil
 }

@@ -65,14 +65,30 @@ database before traffic is resumed.
 ## Local development seed
 
 `go run ./cmd/api` automatically applies pending versioned migrations, then
-seeds the connected development database when `SEED_DEMO_DATA=true` (the default for
-non-production environments). The seed is idempotent and includes connected
-academic, examination, material, assignment, result, monitoring, and audit
-data. Demo credentials are `admin`, `teacher`, and `student`, all using the
-development-only password `12121212`.
+seeds the connected database when `APP_ENV=development` and
+`SEED_DEMO_DATA=true`. Seeding defaults on only for `development`; test,
+staging, and production environments reject demo seeding.
+The deterministic seed refreshes its relative dates and sample workflow states
+on every startup without duplicating its records. It provides three classes,
+nine courses, four teachers, eighteen students, course materials, assignments,
+question banks, draft/scheduled/ongoing/ended exams, attempts, grade results,
+monitoring events, and an audit trail. All identities and submitted work are
+fictional.
 
-Set `SEED_DEMO_DATA=false` when a development database should remain empty. The
-configuration rejects demo seeding when `APP_ENV=production`.
+Every demo account uses the development-only password `12121212`. The admin
+login is `admin`; teacher logins are `rina.maharani`, `adi.pratama`,
+`sari.wulandari`, and `budi.santoso`. Student logins are `randhu.paksi`,
+`andi.saputra`, `salsa.nuraini`, `bagas.ramadhan`, `dimas.kurniawan`,
+`zahra.aisyah`, `raka.pratama`, `putri.anggraini`, `fajar.hidayat`,
+`intan.permatasari`, `reza.maulana`, `citra.lestari`, `dewi.anggraini`,
+`farhan.akbar`, `maya.safitri`, `ilham.fauzi`, `nabila.putri`, and
+`yusuf.ramadhan`.
+
+Set `SEED_DEMO_DATA=false` to keep a development database free of demo data.
+The previous generic demo logins now use the named accounts above (for example,
+`teacher` becomes `rina.maharani` and `student` becomes `randhu.paksi`). The
+seed refreshes its reserved deterministic demo data IDs on startup and fails
+on a demo login collision.
 
 ## Pre-exam checklist
 
