@@ -75,6 +75,19 @@ func seedDemoUsers(tx *gorm.DB) (demoDataset, error) {
 			classNumber: index % 6,
 		})
 	}
+	dataset.superadmin, err = seedDemoUser(tx, demoUserDefinition{suffix: 6, identifier: "arif.wicaksana", fullName: "Arif Wicaksana, M.Pd.", role: users.RoleSuperadmin}, string(passwordHash))
+	if err != nil {
+		return demoDataset{}, err
+	}
+	for _, definition := range []demoUserDefinition{
+		{suffix: 7, identifier: "dewi.kusuma", fullName: "Dewi Kusuma, S.Kom.", role: users.RoleAdmin},
+		{suffix: 8, identifier: "nanda.prasetyo", fullName: "Nanda Prasetyo, S.Pd.", role: users.RoleTeacher},
+		{suffix: 9, identifier: "alya.ramadhani", fullName: "Alya Ramadhani", role: users.RoleStudent},
+	} {
+		if _, err = seedDemoUser(tx, definition, string(passwordHash)); err != nil {
+			return demoDataset{}, err
+		}
+	}
 	return dataset, nil
 }
 
@@ -86,12 +99,13 @@ func seedDemoUser(tx *gorm.DB, definition demoUserDefinition, passwordHash strin
 		return users.User{}, err
 	}
 	if err == nil {
-		currentIdentityIsSeed := existing.Identifier == definition.identifier
+		// Preserve account governance and changed credentials across development restarts.
+		legacyIdentity := false
 		for _, previousID := range definition.previousIDs {
-			currentIdentityIsSeed = currentIdentityIsSeed || existing.Identifier == previousID
+			legacyIdentity = legacyIdentity || existing.Identifier == previousID
 		}
-		if !currentIdentityIsSeed {
-			return users.User{}, fmt.Errorf("reserved demo account ID %d is occupied", definition.suffix)
+		if !legacyIdentity {
+			return existing, nil
 		}
 		var conflicting users.User
 		conflictErr := tx.Where("identifier = ? AND id <> ?", definition.identifier, id).First(&conflicting).Error
@@ -103,22 +117,14 @@ func seedDemoUser(tx *gorm.DB, definition demoUserDefinition, passwordHash strin
 		}
 
 		updates := map[string]any{
-			"identifier":           definition.identifier,
-			"full_name":            definition.fullName,
-			"role":                 definition.role,
-			"status":               users.StatusActive,
-			"password_hash":        passwordHash,
-			"must_change_password": false,
+			"identifier": definition.identifier,
+			"full_name":  definition.fullName,
 		}
 		if updateErr := tx.Model(&existing).Updates(updates).Error; updateErr != nil {
 			return users.User{}, updateErr
 		}
 		existing.Identifier = definition.identifier
 		existing.FullName = definition.fullName
-		existing.Role = definition.role
-		existing.Status = users.StatusActive
-		existing.PasswordHash = passwordHash
-		existing.MustChangePassword = false
 		return existing, nil
 	}
 

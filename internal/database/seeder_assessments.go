@@ -225,6 +225,18 @@ func seedDemoExam(tx *gorm.DB, course demoCourse, kind int, now time.Time) (demo
 		ResultPolicy:        "after_publish",
 		PublishedAt:         publishedAt,
 	}
+	// Approved governance schedules survive the normal relative-date demo refresh.
+	var approved struct {
+		ProposedStartsAt time.Time
+		ProposedEndsAt   time.Time
+	}
+	if err := tx.Table("governance_requests").Select("proposed_starts_at, proposed_ends_at").Where("exam_id = ? AND status = 'approved'", exam.ID).Order("decided_at DESC").Limit(1).Scan(&approved).Error; err != nil {
+		return demoExam{}, err
+	}
+	if !approved.ProposedStartsAt.IsZero() {
+		exam.StartsAt = approved.ProposedStartsAt
+		exam.EndsAt = approved.ProposedEndsAt
+	}
 	if err := seedRecord(tx, &exam); err != nil {
 		return demoExam{}, fmt.Errorf("exam %s: %w", exam.Title, err)
 	}

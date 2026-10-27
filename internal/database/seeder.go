@@ -44,13 +44,14 @@ type demoCourse struct {
 }
 
 type demoDataset struct {
-	admin    users.User
-	teachers []users.User
-	students []demoStudent
-	year     academics.AcademicYear
-	classes  []academics.ClassGroup
-	subjects []academics.Subject
-	courses  []demoCourse
+	admin      users.User
+	superadmin users.User
+	teachers   []users.User
+	students   []demoStudent
+	year       academics.AcademicYear
+	classes    []academics.ClassGroup
+	subjects   []academics.Subject
+	courses    []demoCourse
 }
 
 // SeedDemoData upserts a connected, fictional LMS dataset for local
@@ -82,6 +83,9 @@ func SeedDemoData(ctx context.Context, db *gorm.DB) error {
 		}
 		if err := seedDemoAuditTrail(tx, dataset, now); err != nil {
 			return fmt.Errorf("seed demo audit trail: %w", err)
+		}
+		if err := seedDemoGovernance(tx, dataset, now); err != nil {
+			return fmt.Errorf("seed school governance: %w", err)
 		}
 		return nil
 	})
