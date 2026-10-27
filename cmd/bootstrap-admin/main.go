@@ -34,6 +34,13 @@ func main() {
 	identifier := strings.ToLower(strings.TrimSpace(os.Getenv("BOOTSTRAP_ADMIN_IDENTIFIER")))
 	fullName := strings.TrimSpace(os.Getenv("BOOTSTRAP_ADMIN_NAME"))
 	password := os.Getenv("BOOTSTRAP_ADMIN_PASSWORD")
+	role := users.Role(strings.TrimSpace(os.Getenv("BOOTSTRAP_ADMIN_ROLE")))
+	if role == "" {
+		role = users.RoleAdmin
+	}
+	if role != users.RoleAdmin && role != users.RoleSuperadmin {
+		log.Fatal("BOOTSTRAP_ADMIN_ROLE must be admin or superadmin")
+	}
 	if identifier == "" || fullName == "" || len(password) < 12 {
 		log.Fatal("BOOTSTRAP_ADMIN_IDENTIFIER, BOOTSTRAP_ADMIN_NAME, and a password of at least 12 characters are required")
 	}
@@ -41,6 +48,15 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	repository := users.NewRepository(db.GORM)
+	if role == users.RoleSuperadmin {
+		var count int64
+		if err := db.GORM.Model(&users.User{}).Where("role=?", role).Count(&count).Error; err != nil {
+			log.Fatal("cannot inspect bootstrap state")
+		}
+		if count > 0 {
+			log.Fatal("a superadmin already exists; manage additional superadmins through access governance")
+		}
+	}
 	if _, err := repository.FindByIdentifier(ctx, identifier); err == nil {
 		log.Fatal("an account with the bootstrap identifier already exists")
 	} else if !errors.Is(err, users.ErrNotFound) {
@@ -50,7 +66,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	admin := users.User{ID: uuid.NewString(), Identifier: identifier, FullName: fullName, Role: users.RoleAdmin, Status: users.StatusActive, PasswordHash: string(hash)}
+	admin := users.User{ID: uuid.NewString(), Identifier: identifier, FullName: fullName, Role: role, Status: users.StatusActive, PasswordHash: string(hash), MustChangePassword: true}
 	if err := repository.Create(ctx, &admin); err != nil {
 		log.Fatal(err)
 	}
