@@ -35,6 +35,10 @@ func RunMigrations(ctx context.Context, db *gorm.DB, directory string) error {
 		}
 	}
 	sort.Strings(files)
+	var serverVersion string
+	if err := db.WithContext(ctx).Raw("SELECT VERSION()").Scan(&serverVersion).Error; err != nil {
+		return fmt.Errorf("read database engine: %w", err)
+	}
 
 	if err := db.WithContext(ctx).Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
 		version VARCHAR(255) NOT NULL PRIMARY KEY,
@@ -64,6 +68,7 @@ func RunMigrations(ctx context.Context, db *gorm.DB, directory string) error {
 
 		if err := db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 			for index, statement := range statements {
+				statement = migrationForEngine(statement, serverVersion)
 				if err := tx.Exec(statement).Error; err != nil {
 					return fmt.Errorf("execute statement %d: %w", index+1, err)
 				}
@@ -74,6 +79,13 @@ func RunMigrations(ctx context.Context, db *gorm.DB, directory string) error {
 		}
 	}
 	return nil
+}
+
+func migrationForEngine(statement, version string) string {
+	if strings.Contains(strings.ToLower(version), "mariadb") {
+		return strings.ReplaceAll(statement, "DROP CHECK chk_users_role", "DROP CONSTRAINT chk_users_role")
+	}
+	return statement
 }
 
 func splitMigrationStatements(content string) []string {
