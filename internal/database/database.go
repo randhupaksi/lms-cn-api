@@ -3,6 +3,9 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"log"
+	"os"
+	"time"
 
 	"lms-cn-api/internal/config"
 
@@ -23,7 +26,10 @@ func Open(cfg *config.Config) (*Connection, error) {
 	}
 
 	db, err := gorm.Open(mysql.Open(cfg.DatabaseURL), &gorm.Config{
-		Logger:                                   logger.Default.LogMode(logLevel),
+		Logger: logger.New(log.New(os.Stderr, "", log.LstdFlags), logger.Config{
+			LogLevel: logLevel, SlowThreshold: 200 * time.Millisecond,
+			IgnoreRecordNotFoundError: true, ParameterizedQueries: true,
+		}),
 		DisableForeignKeyConstraintWhenMigrating: true,
 		TranslateError:                           true,
 	})
