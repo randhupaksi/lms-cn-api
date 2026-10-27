@@ -20,6 +20,40 @@ func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
 	group.POST("", h.create)
 	group.PATCH("/:userID", h.update)
 	group.POST("/:userID/reset-credential", h.resetCredential)
+	group.PATCH("/:userID/role", h.changeRole)
+	group.GET("/:userID/sessions", h.sessions)
+	group.POST("/:userID/revoke-sessions", h.revokeSessions)
+}
+
+func (h *Handler) changeRole(c *gin.Context) {
+	var body ChangeRoleRequest
+	if err := request.BindJSON(c, &body); err != nil {
+		response.FromError(c, err)
+		return
+	}
+	actor, _ := middleware.Principal(c)
+	if err := h.service.ChangeRole(c.Request.Context(), actor, c.Param("userID"), body); err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Role diperbarui dan sesi lama diakhiri", nil)
+}
+func (h *Handler) sessions(c *gin.Context) {
+	actor, _ := middleware.Principal(c)
+	rows, err := h.service.Sessions(c.Request.Context(), actor, c.Param("userID"))
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Sesi aktif berhasil dimuat", rows)
+}
+func (h *Handler) revokeSessions(c *gin.Context) {
+	actor, _ := middleware.Principal(c)
+	if err := h.service.RevokeSessions(c.Request.Context(), actor, c.Param("userID")); err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Seluruh sesi pengguna telah diakhiri", nil)
 }
 
 func (h *Handler) list(c *gin.Context) {

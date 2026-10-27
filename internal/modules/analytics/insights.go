@@ -79,7 +79,7 @@ func fillActivity(days []ActivityDay, exams, assignments []activityCount) {
 }
 
 func (s *Service) DashboardInsights(ctx context.Context, actor authz.Principal) (DashboardInsights, error) {
-	if actor.Role != "admin" && actor.Role != "teacher" && actor.Role != "student" {
+	if !actor.IsSchoolAdmin() && actor.Role != "teacher" && actor.Role != "student" {
 		return DashboardInsights{}, apperror.New(http.StatusForbidden, "ANALYTICS_ACCESS_DENIED", "Ringkasan tidak tersedia untuk akun ini")
 	}
 	now := s.now().UTC()

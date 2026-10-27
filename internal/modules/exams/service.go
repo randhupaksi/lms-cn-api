@@ -58,7 +58,7 @@ func (s *Service) List(ctx context.Context, actor authz.Principal, courseID stri
 		if err := s.academics.RequireCourseManager(ctx, actor, courseID); err != nil {
 			return nil, 0, err
 		}
-	} else if err := actor.RequireRole(string(users.RoleAdmin), string(users.RoleTeacher)); err != nil {
+	} else if err := actor.RequireRole(string(users.RoleSuperadmin), string(users.RoleAdmin), string(users.RoleTeacher)); err != nil {
 		return nil, 0, err
 	}
 	filter := ListFilter{Role: actor.Role, UserID: actor.UserID}

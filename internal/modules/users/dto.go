@@ -5,7 +5,7 @@ import "time"
 type CreateRequest struct {
 	Identifier        string `json:"identifier" binding:"required,min=3,max=64"`
 	FullName          string `json:"full_name" binding:"required,min=2,max=160"`
-	Role              Role   `json:"role" binding:"required,oneof=teacher student"`
+	Role              Role   `json:"role" binding:"required,oneof=admin teacher student"`
 	TemporaryPassword string `json:"temporary_password" binding:"required,min=8,max=128"`
 }
 
@@ -17,6 +17,19 @@ type UpdateRequest struct {
 
 type ResetCredentialRequest struct {
 	TemporaryPassword string `json:"temporary_password" binding:"required,min=8,max=128"`
+}
+
+type ChangeRoleRequest struct {
+	Role            Role   `json:"role" binding:"required,oneof=superadmin admin teacher student"`
+	Reason          string `json:"reason" binding:"required,min=10,max=500"`
+	CurrentPassword string `json:"current_password" binding:"required,max=128"`
+}
+
+type SessionResponse struct {
+	ID         string    `json:"id"`
+	CreatedAt  time.Time `json:"created_at"`
+	LastUsedAt time.Time `json:"last_used_at"`
+	ExpiresAt  time.Time `json:"expires_at"`
 }
 
 type Response struct {

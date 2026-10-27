@@ -46,7 +46,7 @@ func (s *Service) ListByExam(ctx context.Context, actor authz.Principal, examID 
 }
 
 func (s *Service) ListScoped(ctx context.Context, actor authz.Principal, filter ListFilter, page pagination.Request) ([]Response, int64, error) {
-	if err := actor.RequireRole(string(users.RoleAdmin), string(users.RoleTeacher)); err != nil {
+	if err := actor.RequireRole(string(users.RoleSuperadmin), string(users.RoleAdmin), string(users.RoleTeacher)); err != nil {
 		return nil, 0, err
 	}
 	if filter.ExamID != "" {

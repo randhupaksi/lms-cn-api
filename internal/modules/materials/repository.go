@@ -62,7 +62,7 @@ func (r *Repository) ListPaged(ctx context.Context, courseID, role, userID strin
 			Select("m.*, c.name AS course_name, mp.completed_at").
 			Joins("LEFT JOIN material_progress mp ON mp.material_id = m.id AND mp.student_id = ?", userID).
 			Where("m.status = ?", StatusPublished)
-	case "admin":
+	case "admin", "superadmin":
 	default:
 		return nil, 0, errors.New("unsupported material list role")
 	}

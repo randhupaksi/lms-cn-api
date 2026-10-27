@@ -13,6 +13,11 @@ type Principal struct {
 	MustChangePassword bool
 }
 
+// IsSchoolAdmin grants school-wide operational scope, never teacher ownership.
+func (p Principal) IsSchoolAdmin() bool {
+	return p.Role == "admin" || p.Role == "superadmin"
+}
+
 func (p Principal) RequireRole(roles ...string) error {
 	for _, role := range roles {
 		if p.Role == role {

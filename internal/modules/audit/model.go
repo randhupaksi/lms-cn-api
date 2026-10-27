@@ -67,7 +67,7 @@ func (s *Service) Record(ctx context.Context, record Record) error {
 }
 
 func (s *Service) List(ctx context.Context, actor authz.Principal, page pagination.Request, filter Filter) ([]Response, int64, error) {
-	if actor.Role != "admin" {
+	if !actor.IsSchoolAdmin() {
 		return nil, 0, apperror.New(http.StatusForbidden, "AUDIT_ACCESS_DENIED", "Audit aktivitas hanya tersedia untuk admin")
 	}
 	query := s.db.WithContext(ctx).Table("audit_logs a")

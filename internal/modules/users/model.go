@@ -5,9 +5,10 @@ import "time"
 type Role string
 
 const (
-	RoleAdmin   Role = "admin"
-	RoleTeacher Role = "teacher"
-	RoleStudent Role = "student"
+	RoleSuperadmin Role = "superadmin"
+	RoleAdmin      Role = "admin"
+	RoleTeacher    Role = "teacher"
+	RoleStudent    Role = "student"
 )
 
 type Status string

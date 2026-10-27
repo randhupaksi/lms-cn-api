@@ -13,6 +13,7 @@ import (
 	"lms-cn-api/internal/modules/audit"
 	"lms-cn-api/internal/modules/auth"
 	"lms-cn-api/internal/modules/exams"
+	"lms-cn-api/internal/modules/governance"
 	"lms-cn-api/internal/modules/grading"
 	"lms-cn-api/internal/modules/materials"
 	"lms-cn-api/internal/modules/monitoring"
@@ -40,7 +41,7 @@ func New(cfg *config.Config, db *gorm.DB) (*Engine, error) {
 
 	auditService := audit.NewService(db)
 	usersRepository := users.NewRepository(db)
-	usersService := users.NewService(usersRepository, auditService)
+	usersService := users.NewService(usersRepository)
 	authRepository := auth.NewRepository(db)
 	tokenManager := auth.NewTokenManager(cfg.JWTSecret, cfg.AppName, cfg.AccessTokenTTL)
 	loginGuard := auth.NewLoginGuard(cfg.LoginAccountRateLimit, cfg.LoginAccountRateWindow)
@@ -58,6 +59,7 @@ func New(cfg *config.Config, db *gorm.DB) (*Engine, error) {
 	analyticsService := analytics.NewService(analytics.NewRepository(db), academicsService)
 
 	api := engine.Group(cfg.APIPrefix)
+	governance.NewHandler(governance.NewService(governance.NewRepository(db), academicsService)).RegisterPublicRoutes(api)
 	api.GET("/health", func(c *gin.Context) {
 		sqlDB, err := db.DB()
 		if err != nil || sqlDB.PingContext(c.Request.Context()) != nil {
@@ -77,7 +79,7 @@ func New(cfg *config.Config, db *gorm.DB) (*Engine, error) {
 	authHandler.RegisterProtectedRoutes(protected.Group("/auth"))
 
 	adminUsers := protected.Group("/users")
-	adminUsers.Use(middleware.RequireRoles(string(users.RoleAdmin)))
+	adminUsers.Use(middleware.RequireRoles(string(users.RoleSuperadmin), string(users.RoleAdmin)))
 	users.NewHandler(usersService).RegisterRoutes(adminUsers)
 	academics.NewHandler(academicsService).RegisterRoutes(protected)
 	questions.NewHandler(questionsService).RegisterRoutes(protected.Group("/questions"))
@@ -85,6 +87,7 @@ func New(cfg *config.Config, db *gorm.DB) (*Engine, error) {
 	materials.NewHandler(materialsService).RegisterRoutes(protected.Group("/materials"))
 	assignments.NewHandler(assignmentsService).RegisterRoutes(protected.Group("/assignments"))
 	analytics.NewHandler(analyticsService).RegisterRoutes(protected.Group("/analytics"))
+	governance.NewHandler(governance.NewService(governance.NewRepository(db), academicsService)).RegisterRoutes(protected.Group("/governance"))
 
 	student := protected.Group("/student")
 	student.Use(middleware.RequireRoles(string(users.RoleStudent)))
@@ -92,15 +95,15 @@ func New(cfg *config.Config, db *gorm.DB) (*Engine, error) {
 	results.NewHandler(resultsService).RegisterStudentRoutes(student.Group("/results"))
 
 	staffResults := protected.Group("/results")
-	staffResults.Use(middleware.RequireRoles(string(users.RoleAdmin), string(users.RoleTeacher)))
+	staffResults.Use(middleware.RequireRoles(string(users.RoleSuperadmin), string(users.RoleAdmin), string(users.RoleTeacher)))
 	results.NewHandler(resultsService).RegisterStaffRoutes(staffResults)
 
 	staffMonitoring := protected.Group("/monitoring")
-	staffMonitoring.Use(middleware.RequireRoles(string(users.RoleAdmin), string(users.RoleTeacher)))
+	staffMonitoring.Use(middleware.RequireRoles(string(users.RoleSuperadmin), string(users.RoleAdmin), string(users.RoleTeacher)))
 	monitoring.NewHandler(monitoringService).RegisterRoutes(staffMonitoring)
 
 	adminAudit := protected.Group("/audit-logs")
-	adminAudit.Use(middleware.RequireRoles(string(users.RoleAdmin)))
+	adminAudit.Use(middleware.RequireRoles(string(users.RoleSuperadmin), string(users.RoleAdmin)))
 	audit.NewHandler(auditService).RegisterRoutes(adminAudit)
 
 	return &Engine{Engine: engine, ExpiryWorker: attempts.NewExpiryWorker(attemptsService, 15*time.Second)}, nil

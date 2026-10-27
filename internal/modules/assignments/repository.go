@@ -68,7 +68,7 @@ func (r *Repository) ListPaged(ctx context.Context, courseID, role, userID strin
 				s.submitted_at AS submission_submitted_at, s.graded_at AS submission_graded_at`).
 			Joins("LEFT JOIN assignment_submissions s ON s.assignment_id = a.id AND s.student_id = ?", userID).
 			Where("a.status IN ?", []string{StatusPublished, StatusClosed})
-	case "admin":
+	case "admin", "superadmin":
 	default:
 		return nil, 0, errors.New("unsupported assignment list role")
 	}

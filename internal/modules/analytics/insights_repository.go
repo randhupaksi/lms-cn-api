@@ -11,7 +11,7 @@ import (
 // EXISTS avoids multiplying aggregates when a course has multiple managers.
 func insightCourseScope(query *gorm.DB, role, userID, courseColumn string) *gorm.DB {
 	switch role {
-	case "admin":
+	case "admin", "superadmin":
 		return query
 	case "teacher":
 		return query.Where("EXISTS (SELECT 1 FROM course_teachers scope_member WHERE scope_member.course_id = "+courseColumn+" AND scope_member.teacher_id = ?)", userID)
@@ -25,7 +25,7 @@ func insightCourseScope(query *gorm.DB, role, userID, courseColumn string) *gorm
 func (r *Repository) InsightMetrics(ctx context.Context, role, userID string) ([]Metric, error) {
 	var metrics []Metric
 	queries := []*gorm.DB{}
-	if role == "admin" {
+	if role == "admin" || role == "superadmin" {
 		metrics = []Metric{{Key: "teachers", Label: "Guru aktif"}, {Key: "students", Label: "Siswa aktif"}, {Key: "pending_grading", Label: "Pengumpulan perlu dinilai"}}
 		queries = append(queries, r.db.WithContext(ctx).Table("users").Where("role = ? AND status = ?", "teacher", "active"), r.db.WithContext(ctx).Table("users").Where("role = ? AND status = ?", "student", "active"))
 	} else {

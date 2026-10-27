@@ -130,7 +130,7 @@ func (s *Service) VerifyAccessToken(rawToken string) (authz.Principal, error) {
 
 func (s *Service) ValidateSession(ctx context.Context, principal authz.Principal) error {
 	session, err := s.repository.FindByID(ctx, principal.SessionID)
-	if err != nil || session.UserID != principal.UserID || !session.IsValid(s.now().UTC()) {
+	if err != nil || session.UserID != principal.UserID || !session.IsValid(s.now().UTC()) || string(session.User.Role) != principal.Role || session.User.MustChangePassword != principal.MustChangePassword {
 		return errors.New("session is not active")
 	}
 	return nil

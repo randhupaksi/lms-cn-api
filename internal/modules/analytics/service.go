@@ -25,7 +25,7 @@ func (s *Service) Dashboard(ctx context.Context, actor authz.Principal) (Dashboa
 	result := Dashboard{Role: actor.Role}
 	now := s.now().UTC()
 	switch actor.Role {
-	case "admin":
+	case "admin", "superadmin":
 		counts, err := s.repository.AdminDashboardCounts(ctx, now)
 		if err != nil {
 			return Dashboard{}, analyticsReadError(err)
