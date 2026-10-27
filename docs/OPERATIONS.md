@@ -70,10 +70,15 @@ seeds the connected database when `APP_ENV=development` and
 staging, and production environments reject demo seeding.
 The deterministic seed refreshes its relative dates and sample workflow states
 on every startup without duplicating its records. It provides three classes,
-nine courses, four teachers, eighteen students, course materials, assignments,
+nine courses, five teachers, nineteen students, one superadmin, two admins, course materials, assignments,
 question banks, draft/scheduled/ongoing/ended exams, attempts, grade results,
 monitoring events, and an audit trail. All identities and submitted work are
 fictional.
+
+School governance also seeds a calendar, schedule-decision inbox and initial
+settings history. Superadmin login is `arif.wicaksana`; additional demo users
+are `dewi.kusuma` (admin), `nanda.prasetyo` (teacher), and `alya.ramadhani` (student).
+See [SCHOOL_GOVERNANCE.md](SCHOOL_GOVERNANCE.md).
 
 Every demo account uses the development-only password `12121212`. The admin
 login is `admin`; teacher logins are `rina.maharani`, `adi.pratama`,
@@ -87,8 +92,11 @@ login is `admin`; teacher logins are `rina.maharani`, `adi.pratama`,
 Set `SEED_DEMO_DATA=false` to keep a development database free of demo data.
 The previous generic demo logins now use the named accounts above (for example,
 `teacher` becomes `rina.maharani` and `student` becomes `randhu.paksi`). The
-seed refreshes its reserved deterministic demo data IDs on startup and fails
-on a demo login collision.
+seed refreshes its reserved deterministic academic IDs on startup and fails
+on a new demo login collision. Existing account role, status, profile edits and
+changed credentials persist. Previously edited credentials are not reset to the
+initial demo password. Resolved governance requests, approved schedules and
+edited/archived school agendas also persist.
 
 ## Pre-exam checklist
 

@@ -31,7 +31,7 @@ pkg is reusable and domain-agnostic
 
 Implemented modules are `auth`, `users`, `academics`, `questions`, `exams`,
 `attempts`, `grading`, `results`, `audit`, `monitoring`, `materials`,
-`assignments`, and `analytics`. Cross-module access uses explicit service
+`assignments`, `analytics`, and `governance`. Cross-module access uses explicit service
 boundaries for course ownership and enrollment checks. Query composition stays
 inside each repository; services coordinate authorization and business rules.
 
@@ -54,9 +54,20 @@ inside each repository; services coordinate authorization and business rules.
   readiness before reporting the service ready.
 - Structured request logs include request ID, route, status, latency, and
   client address without request bodies, credentials, answers, or tokens.
+- ORM logs omit bound query parameters and expected record-not-found errors,
+  including session-token hashes used in authentication queries.
 - Login protection combines a network-level request ceiling with a stricter
   per-identifier throttle whose in-memory key is SHA-256 hashed.
-- Audit reads are admin-only and operational monitoring remains course-scoped.
+- Audit reads admit admin and school superadmin. Teacher operational monitoring remains course-scoped.
+- `governance` owns school settings/history, agenda, schedule requests, readiness,
+  data-quality checks and aggregate course reports. Public school profile is a
+  whitelisted DTO. Schedule decisions lock the exam in the same transaction as
+  request/audit writes; answer and result publication contracts stay teacher-owned.
+- `users` owns protected target-role policy, role changes and session revocation.
+  School-wide operational access explicitly admits `superadmin`; teacher-only
+  authoring/grading and student-only attempts remain exact role boundaries.
+
+See [SCHOOL_GOVERNANCE.md](SCHOOL_GOVERNANCE.md) for contracts and invariants.
 - Versioned migrations are the only production schema path. Backup, restore,
   load-test, and incident procedures are documented in `docs/OPERATIONS.md`.
 
