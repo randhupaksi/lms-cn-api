@@ -18,11 +18,11 @@ import (
 
 type Service struct {
 	repository *Repository
-	academics  *academics.Service
+	academics  academics.CourseManagerAccess
 	audit      audit.Recorder
 }
 
-func NewService(repository *Repository, academicsService *academics.Service, auditRecorder audit.Recorder) *Service {
+func NewService(repository *Repository, academicsService academics.CourseManagerAccess, auditRecorder audit.Recorder) *Service {
 	return &Service{repository: repository, academics: academicsService, audit: auditRecorder}
 }
 
