@@ -11,7 +11,7 @@ import (
 // EXISTS avoids multiplying aggregates when a course has multiple managers.
 func insightCourseScope(query *gorm.DB, role, userID, courseColumn string) *gorm.DB {
 	switch role {
-	case "admin", "superadmin", "principal":
+	case "admin", "superadmin", "principal", "curriculum":
 		return query
 	case "teacher":
 		return query.Where("EXISTS (SELECT 1 FROM course_teachers scope_member WHERE scope_member.course_id = "+courseColumn+" AND scope_member.teacher_id = ?)", userID)
