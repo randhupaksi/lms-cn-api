@@ -15,7 +15,7 @@ type Principal struct {
 
 // IsSchoolAdmin grants school-wide operational scope, never teacher ownership.
 func (p Principal) IsSchoolAdmin() bool {
-	return p.Role == "admin" || p.Role == "superadmin"
+	return p.Role == "admin" || p.Role == "superadmin" || p.Role == "principal"
 }
 
 func (p Principal) RequireRole(roles ...string) error {

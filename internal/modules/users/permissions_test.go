@@ -7,9 +7,11 @@ import (
 )
 
 func TestAdministrativeTargetBoundary(t *testing.T) {
-	for _, actor := range []Role{RoleSuperadmin, RoleAdmin, RoleTeacher, RoleStudent} {
-		for _, target := range []Role{RoleSuperadmin, RoleAdmin, RoleTeacher, RoleStudent} {
-			allowed := actor == RoleSuperadmin || (actor == RoleAdmin && (target == RoleTeacher || target == RoleStudent))
+	for _, actor := range []Role{RoleSuperadmin, RolePrincipal, RoleAdmin, RoleTeacher, RoleStudent} {
+		for _, target := range []Role{RoleSuperadmin, RolePrincipal, RoleAdmin, RoleTeacher, RoleStudent} {
+			allowed := actor == RoleSuperadmin ||
+				(actor == RolePrincipal && (target == RoleAdmin || target == RoleTeacher || target == RoleStudent)) ||
+				(actor == RoleAdmin && (target == RoleTeacher || target == RoleStudent))
 			err := canManageTarget(authz.Principal{Role: string(actor)}, User{Role: target})
 			if (err == nil) != allowed {
 				t.Fatalf("actor %s target %s", actor, target)
@@ -20,7 +22,7 @@ func TestAdministrativeTargetBoundary(t *testing.T) {
 func TestSensitiveActionsDenyBeforeDatabase(t *testing.T) {
 	s := NewService(nil)
 	ctx := context.Background()
-	for _, role := range []string{"admin", "teacher", "student", "unknown"} {
+	for _, role := range []string{"principal", "admin", "teacher", "student", "unknown"} {
 		actor := authz.Principal{Role: role}
 		if err := s.ChangeRole(ctx, actor, "target", ChangeRoleRequest{Role: RoleSuperadmin}); err == nil {
 			t.Fatal("role escalation admitted")

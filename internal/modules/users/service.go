@@ -25,13 +25,16 @@ func NewService(repository *Repository) *Service {
 }
 
 func (s *Service) Create(ctx context.Context, actor authz.Principal, request CreateRequest) (Response, error) {
-	if err := actor.RequireRole(string(RoleSuperadmin), string(RoleAdmin)); err != nil {
+	if err := actor.RequireRole(string(RoleSuperadmin), string(RolePrincipal), string(RoleAdmin)); err != nil {
 		return Response{}, err
 	}
-	if request.Role == RoleAdmin && actor.Role != string(RoleSuperadmin) {
-		return Response{}, apperror.New(http.StatusForbidden, "ROLE_ASSIGNMENT_DENIED", "Hanya superadmin dapat membuat administrator")
+	if request.Role == RolePrincipal && actor.Role != string(RoleSuperadmin) {
+		return Response{}, apperror.New(http.StatusForbidden, "ROLE_ASSIGNMENT_DENIED", "Hanya superadmin dapat membuat akun kepala sekolah")
 	}
-	if request.Role != RoleAdmin && request.Role != RoleTeacher && request.Role != RoleStudent {
+	if request.Role == RoleAdmin && actor.Role == string(RoleAdmin) {
+		return Response{}, apperror.New(http.StatusForbidden, "ROLE_ASSIGNMENT_DENIED", "Hanya superadmin atau kepala sekolah dapat membuat administrator")
+	}
+	if request.Role != RolePrincipal && request.Role != RoleAdmin && request.Role != RoleTeacher && request.Role != RoleStudent {
 		return Response{}, apperror.New(422, "INVALID_CREATE_ROLE", "Role akun baru tidak valid")
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(request.TemporaryPassword), bcrypt.DefaultCost)
@@ -53,13 +56,16 @@ func (s *Service) Create(ctx context.Context, actor authz.Principal, request Cre
 }
 
 func (s *Service) List(ctx context.Context, actor authz.Principal, page pagination.Request, search, role string) ([]Response, int64, error) {
-	if err := actor.RequireRole(string(RoleSuperadmin), string(RoleAdmin)); err != nil {
+	if err := actor.RequireRole(string(RoleSuperadmin), string(RolePrincipal), string(RoleAdmin)); err != nil {
 		return nil, 0, err
 	}
-	if actor.Role != string(RoleSuperadmin) && role != "" && role != "teacher" && role != "student" {
-		return nil, 0, apperror.New(http.StatusForbidden, "ROLE_ACCESS_DENIED", "Daftar role ini hanya tersedia untuk superadmin")
+	if actor.Role == string(RolePrincipal) && role != "" && role != string(RoleAdmin) && role != string(RoleTeacher) && role != string(RoleStudent) {
+		return nil, 0, apperror.New(http.StatusForbidden, "ROLE_ACCESS_DENIED", "Kepala sekolah hanya dapat melihat akun operasional sekolah")
 	}
-	users, total, err := s.repository.List(ctx, page, search, role, actor.Role == string(RoleSuperadmin))
+	if actor.Role == string(RoleAdmin) && role != "" && role != string(RoleTeacher) && role != string(RoleStudent) {
+		return nil, 0, apperror.New(http.StatusForbidden, "ROLE_ACCESS_DENIED", "Administrator hanya dapat melihat akun guru dan siswa")
+	}
+	users, total, err := s.repository.List(ctx, page, search, role, Role(actor.Role))
 	if err != nil {
 		return nil, 0, apperror.Wrap(http.StatusInternalServerError, "USERS_READ_FAILED", "Gagal memuat pengguna", err)
 	}
@@ -71,8 +77,8 @@ func (s *Service) List(ctx context.Context, actor authz.Principal, page paginati
 }
 
 func (s *Service) Update(ctx context.Context, actor authz.Principal, id string, request UpdateRequest) (Response, error) {
-	if !actor.IsSchoolAdmin() {
-		return Response{}, actor.RequireRole(string(RoleAdmin), string(RoleSuperadmin))
+	if err := actor.RequireRole(string(RoleSuperadmin), string(RolePrincipal), string(RoleAdmin)); err != nil {
+		return Response{}, err
 	}
 	var result *User
 	err := s.repository.Mutate(ctx, id, request.Status == StatusInactive, func(repo *Repository, user *User) error {
@@ -106,7 +112,7 @@ func (s *Service) Update(ctx context.Context, actor authz.Principal, id string, 
 }
 
 func (s *Service) ResetCredential(ctx context.Context, actor authz.Principal, id string, request ResetCredentialRequest) error {
-	if err := actor.RequireRole(string(RoleSuperadmin), string(RoleAdmin)); err != nil {
+	if err := actor.RequireRole(string(RoleSuperadmin), string(RolePrincipal), string(RoleAdmin)); err != nil {
 		return err
 	}
 	user, err := s.repository.FindByID(ctx, id)
@@ -135,7 +141,9 @@ func (s *Service) ResetCredential(ctx context.Context, actor authz.Principal, id
 }
 
 func canManageTarget(actor authz.Principal, target User) error {
-	if actor.Role == string(RoleSuperadmin) || (actor.Role == string(RoleAdmin) && (target.Role == RoleTeacher || target.Role == RoleStudent)) {
+	if actor.Role == string(RoleSuperadmin) ||
+		(actor.Role == string(RolePrincipal) && (target.Role == RoleAdmin || target.Role == RoleTeacher || target.Role == RoleStudent)) ||
+		(actor.Role == string(RoleAdmin) && (target.Role == RoleTeacher || target.Role == RoleStudent)) {
 		return nil
 	}
 	return apperror.New(http.StatusForbidden, "PRIVILEGED_ACCOUNT_PROTECTED", "Akun administrator hanya dapat dikelola superadmin")

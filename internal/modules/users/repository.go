@@ -50,9 +50,13 @@ func (r *Repository) FindByIdentifier(ctx context.Context, identifier string) (U
 	return user, err
 }
 
-func (r *Repository) List(ctx context.Context, page pagination.Request, search, role string, privileged bool) ([]User, int64, error) {
+func (r *Repository) List(ctx context.Context, page pagination.Request, search, role string, actorRole Role) ([]User, int64, error) {
 	query := r.db.WithContext(ctx).Model(&User{})
-	if !privileged {
+	switch actorRole {
+	case RoleSuperadmin:
+	case RolePrincipal:
+		query = query.Where("role IN ?", []Role{RoleAdmin, RoleTeacher, RoleStudent})
+	default:
 		query = query.Where("role IN ?", []Role{RoleTeacher, RoleStudent})
 	}
 	if search = strings.TrimSpace(search); search != "" {
