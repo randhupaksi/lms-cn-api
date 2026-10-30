@@ -51,6 +51,9 @@ func (s *Service) Create(ctx context.Context, actor authz.Principal, request Wri
 }
 
 func (s *Service) List(ctx context.Context, actor authz.Principal, courseID string, page pagination.Request, filter ListFilter) ([]Response, int64, error) {
+	if actor.Role == string(users.RolePrincipal) {
+		return nil, 0, apperror.New(http.StatusForbidden, "QUESTION_ACCESS_DENIED", "Bank soal tidak tersedia untuk akun ini")
+	}
 	if courseID != "" {
 		if err := s.academics.RequireCourseManager(ctx, actor, courseID); err != nil {
 			return nil, 0, err

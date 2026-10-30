@@ -59,7 +59,7 @@ func (s *Service) ListPaged(ctx context.Context, actor authz.Principal, courseID
 		} else if err := s.academics.RequireCourseManager(ctx, actor, courseID); err != nil {
 			return nil, 0, err
 		}
-	} else if err := actor.RequireRole(string(users.RoleSuperadmin), string(users.RoleAdmin), string(users.RoleTeacher), string(users.RoleStudent)); err != nil {
+	} else if err := actor.RequireRole(string(users.RoleSuperadmin), string(users.RolePrincipal), string(users.RoleAdmin), string(users.RoleTeacher), string(users.RoleStudent)); err != nil {
 		return nil, 0, err
 	}
 	filter.Search = strings.TrimSpace(filter.Search)
