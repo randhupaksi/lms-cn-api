@@ -21,7 +21,7 @@ func (r *Repository) ListActionAssignees(ctx context.Context) ([]LeadershipActio
 	rows := []LeadershipActionAssignee{}
 	err := r.db.WithContext(ctx).Table("users").
 		Select("id, full_name, role").
-		Where("status = ? AND role IN ?", "active", []string{"admin", "teacher"}).
+		Where("status = ? AND role IN ?", "active", []string{"admin", "teacher", "curriculum"}).
 		Order("role, full_name, id").Scan(&rows).Error
 	return rows, err
 }
@@ -57,7 +57,7 @@ func (r *Repository) CreateLeadershipAction(ctx context.Context, value Leadershi
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if value.AssigneeID != nil {
 			var count int64
-			if err := tx.Table("users").Where("id = ? AND status = ? AND role IN ?", *value.AssigneeID, "active", []string{"admin", "teacher"}).Count(&count).Error; err != nil {
+			if err := tx.Table("users").Where("id = ? AND status = ? AND role IN ?", *value.AssigneeID, "active", []string{"admin", "teacher", "curriculum"}).Count(&count).Error; err != nil {
 				return err
 			}
 			if count == 0 {

@@ -21,7 +21,7 @@ const examSelect = `e.id, e.title, e.course_id, c.name AS course_name, cg.name A
 
 func (r *Repository) Exams(ctx context.Context, page, size int, search, role, userID string) ([]ExamReadiness, int64, error) {
 	q := r.db.WithContext(ctx).Table("exams e").Joins("JOIN courses c ON c.id=e.course_id").Joins("JOIN class_groups cg ON cg.id=c.class_group_id")
-	if role == "teacher" {
+	if role == "teacher" || role == "curriculum" {
 		q = q.Where("EXISTS (SELECT 1 FROM course_teachers ct WHERE ct.course_id=e.course_id AND ct.teacher_id=?)", userID)
 	}
 	if search != "" {

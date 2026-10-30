@@ -17,7 +17,7 @@ func isSchoolLeader(actor authz.Principal) bool {
 }
 
 func canAccessLeadershipAction(actor authz.Principal, value LeadershipAction) bool {
-	return isSchoolLeader(actor) || ((actor.Role == "admin" || actor.Role == "teacher") && value.AssigneeID != nil && *value.AssigneeID == actor.UserID)
+	return isSchoolLeader(actor) || ((actor.Role == "admin" || actor.IsTeachingStaff()) && value.AssigneeID != nil && *value.AssigneeID == actor.UserID)
 }
 
 func validActionCategory(value string) bool {
@@ -59,7 +59,7 @@ func (s *Service) ActionAssignees(ctx context.Context, actor authz.Principal) ([
 }
 
 func (s *Service) ListLeadershipActions(ctx context.Context, actor authz.Principal, status, category string, page, size int) ([]LeadershipActionResponse, int64, error) {
-	if err := actor.RequireRole("superadmin", "principal", "admin", "teacher"); err != nil {
+	if err := actor.RequireRole("superadmin", "principal", "curriculum", "admin", "teacher"); err != nil {
 		return nil, 0, err
 	}
 	if status != "" && status != "open" && status != "in_progress" && status != "blocked" && status != "completed" && status != "cancelled" {
@@ -133,7 +133,7 @@ func validLeadershipActionStatus(role, current, next string) error {
 	if role == "principal" || role == "superadmin" {
 		return nil
 	}
-	if role != "admin" && role != "teacher" {
+	if role != "admin" && role != "teacher" && role != "curriculum" {
 		return apperror.New(http.StatusForbidden, "LEADERSHIP_ACTION_DENIED", "Akun ini tidak dapat memperbarui tindak lanjut")
 	}
 	if current == "completed" || current == "cancelled" || next == "open" || next == "cancelled" {
@@ -143,7 +143,7 @@ func validLeadershipActionStatus(role, current, next string) error {
 }
 
 func (s *Service) UpdateLeadershipActionStatus(ctx context.Context, actor authz.Principal, id string, input UpdateLeadershipActionStatusInput) error {
-	if err := actor.RequireRole("superadmin", "principal", "admin", "teacher"); err != nil {
+	if err := actor.RequireRole("superadmin", "principal", "curriculum", "admin", "teacher"); err != nil {
 		return err
 	}
 	if !validActionStatus(input.Status) {
@@ -176,7 +176,7 @@ func (s *Service) UpdateLeadershipActionStatus(ctx context.Context, actor authz.
 }
 
 func (s *Service) LeadershipActionUpdates(ctx context.Context, actor authz.Principal, id string) ([]LeadershipActionUpdateResponse, error) {
-	if err := actor.RequireRole("superadmin", "principal", "admin", "teacher"); err != nil {
+	if err := actor.RequireRole("superadmin", "principal", "curriculum", "admin", "teacher"); err != nil {
 		return nil, err
 	}
 	value, err := s.repository.FindLeadershipAction(ctx, id)
@@ -204,7 +204,7 @@ func (s *Service) LeadershipActionUpdates(ctx context.Context, actor authz.Princ
 }
 
 func (s *Service) LeadershipActionCounts(ctx context.Context, actor authz.Principal) (open, overdue int64, err error) {
-	if err = actor.RequireRole("superadmin", "principal", "admin", "teacher"); err != nil {
+	if err = actor.RequireRole("superadmin", "principal", "curriculum", "admin", "teacher"); err != nil {
 		return 0, 0, err
 	}
 	open, err = s.repository.LeadershipActionCount(ctx, actor.Role, actor.UserID, "open", "in_progress", "blocked")

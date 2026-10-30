@@ -26,6 +26,9 @@ func NewService(repository *Repository, courses CourseAccess) *Service {
 	return &Service{repository: repository, courses: courses, now: time.Now}
 }
 func owner(actor authz.Principal) error { return actor.RequireRole("superadmin", "principal") }
+func academicCoordinator(actor authz.Principal) error {
+	return actor.RequireRole("superadmin", "principal", "curriculum")
+}
 
 type PublicProfile struct {
 	SchoolName     string `json:"school_name"`
@@ -39,7 +42,7 @@ func (s *Service) PublicProfile(ctx context.Context) (PublicProfile, error) {
 	return PublicProfile{SchoolName: v.SchoolName, Motto: v.Motto, ContactEmail: v.ContactEmail, SupportMessage: v.SupportMessage}, failure(err)
 }
 func staff(actor authz.Principal) error {
-	return actor.RequireRole("superadmin", "principal", "admin", "teacher")
+	return actor.RequireRole("superadmin", "principal", "curriculum", "admin", "teacher")
 }
 func failure(err error) error {
 	if err == nil {
@@ -84,7 +87,7 @@ func decorate(row *ExamReadiness, now time.Time) {
 	}
 }
 func (s *Service) Overview(ctx context.Context, a authz.Principal) (Overview, error) {
-	if err := owner(a); err != nil {
+	if err := academicCoordinator(a); err != nil {
 		return Overview{}, err
 	}
 	now := s.now().UTC()
@@ -118,7 +121,7 @@ func (s *Service) Exams(ctx context.Context, a authz.Principal, page, size int, 
 	return rows, total, failure(err)
 }
 func (s *Service) Quality(ctx context.Context, a authz.Principal) ([]QualityGroup, error) {
-	if err := owner(a); err != nil {
+	if err := academicCoordinator(a); err != nil {
 		return nil, err
 	}
 	v, e := s.repository.Quality(ctx)
@@ -144,7 +147,7 @@ func validateSchedule(exam ExamReadiness, start, end, now time.Time) error {
 	return nil
 }
 func (s *Service) CreateRequest(ctx context.Context, a authz.Principal, input ScheduleInput) error {
-	if err := a.RequireRole("teacher", "admin"); err != nil {
+	if err := a.RequireRole("teacher", "curriculum", "admin"); err != nil {
 		return err
 	}
 	if len([]rune(strings.TrimSpace(input.Reason))) < 10 {
@@ -154,8 +157,10 @@ func (s *Service) CreateRequest(ctx context.Context, a authz.Principal, input Sc
 	if err != nil {
 		return failure(err)
 	}
-	if err = s.courses.RequireCourseManager(ctx, a, row.CourseID); err != nil {
-		return err
+	if !a.CanCoordinateAcademics() {
+		if err = s.courses.RequireCourseManager(ctx, a, row.CourseID); err != nil {
+			return err
+		}
 	}
 	value := ScheduleRequest{ID: uuid.NewString(), ExamID: input.ExamID, RequesterID: a.UserID, Reason: strings.TrimSpace(input.Reason), ProposedStartsAt: input.ProposedStartsAt.UTC(), ProposedEndsAt: input.ProposedEndsAt.UTC(), Status: "pending", CreatedAt: s.now().UTC()}
 	return failure(s.repository.CreateRequest(ctx, value, func(exam ExamReadiness) error {
@@ -203,7 +208,7 @@ func (s *Service) Cancel(ctx context.Context, a authz.Principal, id string) erro
 	}))
 }
 func (s *Service) Agenda(ctx context.Context, a authz.Principal, from, to time.Time) ([]Event, error) {
-	if err := owner(a); err != nil {
+	if err := academicCoordinator(a); err != nil {
 		return nil, err
 	}
 	if !to.After(from) || to.Sub(from) > 366*24*time.Hour {
@@ -222,7 +227,7 @@ func (s *Service) Agenda(ctx context.Context, a authz.Principal, from, to time.T
 	return events, nil
 }
 func (s *Service) SaveEvent(ctx context.Context, a authz.Principal, id string, input EventInput) error {
-	if err := owner(a); err != nil {
+	if err := academicCoordinator(a); err != nil {
 		return err
 	}
 	if len([]rune(strings.TrimSpace(input.Title))) < 3 {
@@ -240,7 +245,7 @@ func (s *Service) SaveEvent(ctx context.Context, a authz.Principal, id string, i
 	return failure(s.repository.SaveEvent(ctx, value, a.UserID, create))
 }
 func (s *Service) ArchiveEvent(ctx context.Context, a authz.Principal, id string, version int) error {
-	if err := owner(a); err != nil {
+	if err := academicCoordinator(a); err != nil {
 		return err
 	}
 	return failure(s.repository.ArchiveEvent(ctx, id, a.UserID, version))
@@ -273,7 +278,7 @@ func (s *Service) History(ctx context.Context, a authz.Principal) ([]ChangeRow, 
 	return v, failure(e)
 }
 func (s *Service) Reports(ctx context.Context, a authz.Principal, year, classID string, page, size int) ([]CourseReport, int64, error) {
-	if err := owner(a); err != nil {
+	if err := academicCoordinator(a); err != nil {
 		return nil, 0, err
 	}
 	v, n, e := s.repository.Reports(ctx, year, classID, page, size)

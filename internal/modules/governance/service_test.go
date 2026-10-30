@@ -61,6 +61,12 @@ func TestAuthorizationBeforeRepository(t *testing.T) {
 	if err := owner(authz.Principal{Role: "principal"}); err != nil {
 		t.Fatal("principal should share school governance access")
 	}
+	if err := academicCoordinator(authz.Principal{Role: "curriculum"}); err != nil {
+		t.Fatal("curriculum should have academic coordination access")
+	}
+	if err := owner(authz.Principal{Role: "curriculum"}); err == nil {
+		t.Fatal("curriculum should not receive leadership decision access")
+	}
 	for _, role := range []string{"student", "teacher", "admin", "unknown"} {
 		if _, err := s.Overview(ctx, authz.Principal{Role: role}); err == nil {
 			t.Fatalf("overview admitted %s", role)

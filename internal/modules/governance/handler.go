@@ -24,14 +24,14 @@ func (h *Handler) RegisterPublicRoutes(group *gin.RouterGroup) {
 	group.GET("/school-profile", func(c *gin.Context) { value, err := h.service.PublicProfile(c.Request.Context()); reply(c, value, err) })
 }
 func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
-	group.Use(middleware.RequireRoles("superadmin", "principal", "admin", "teacher"))
+	group.Use(middleware.RequireRoles("superadmin", "principal", "curriculum", "admin", "teacher"))
 	group.GET("/requests", h.requests)
 	group.POST("/requests", h.createRequest)
 	group.POST("/requests/:id/decision", h.decide)
 	group.POST("/requests/:id/cancel", h.cancel)
 	group.GET("/request-exams", h.exams)
 	actions := group.Group("/actions")
-	actions.Use(middleware.RequireRoles("superadmin", "principal", "admin", "teacher"))
+	actions.Use(middleware.RequireRoles("superadmin", "principal", "curriculum", "admin", "teacher"))
 	actions.GET("", h.leadershipActions)
 	actions.GET("/summary", h.leadershipActionSummary)
 	actions.GET("/assignees", h.leadershipActionAssignees)
