@@ -64,8 +64,10 @@ inside each repository; services coordinate authorization and business rules.
   whitelisted DTO. Schedule decisions lock the exam in the same transaction as
   request/audit writes; answer and result publication contracts stay teacher-owned.
 - `users` owns protected target-role policy, role changes and session revocation.
-  School-wide operational access explicitly admits `superadmin` and `principal`; teacher-only
-  authoring/grading and student-only attempts remain exact role boundaries.
+  School-wide academic coordination admits `curriculum` through explicit capability
+  checks; it does not grant account, audit, settings, or schedule-decision access.
+  Teaching authoring/grading remains assignment-scoped for both `teacher` and
+  `curriculum`; student attempts remain student-only.
 
 See [SCHOOL_GOVERNANCE.md](SCHOOL_GOVERNANCE.md) for contracts and invariants.
 - Versioned migrations are the only production schema path. Backup, restore,

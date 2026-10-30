@@ -1,11 +1,16 @@
 # School governance API
 
-Scope: one school, five fixed roles (`superadmin`, `principal`, `admin`, `teacher`, `student`).
+Scope: one school, six fixed roles (`superadmin`, `principal`, `curriculum`, `admin`, `teacher`, `student`).
 Principal shares school governance, academic administration, monitoring, reports,
 and read-only audit access. Principal can manage admin, teacher, and student
 accounts. Only superadmin can create or manage principal/superadmin accounts,
 change roles, inspect sessions, and revoke sessions. Teacher ownership of
 authoring, grading, and result publication remains unchanged.
+Curriculum is a teaching-staff role with school-wide academic coordination. It
+manages academic structure and can review readiness, quality data, academic
+agenda, and reports. It can author, grade, and publish only in courses where it
+is explicitly assigned. It cannot manage accounts, audit logs, school settings,
+or approve schedule requests.
 Superadmin and principal share school governance. Assigned teachers continue to own
 content, grading, and result publication. Superadmin does not bypass those rules.
 
@@ -14,24 +19,24 @@ content, grading, and result publication. Superadmin does not bypass those rules
 | Method / path | Actor | Behavior |
 |---|---|---|
 | GET `/school-profile` | Public | Whitelisted school name, motto, support email/message only |
-| GET `/governance/overview` | Superadmin, principal | Whole-school counters, role distribution, global exam lifecycle, six upcoming/running exams, quality checks, 30-day agenda |
-| GET `/governance/exams` | Superadmin, principal | Paginated readiness, search by title/course |
+| GET `/governance/overview` | Superadmin, principal, curriculum | Whole-school counters, role distribution, global exam lifecycle, six upcoming/running exams, quality checks, 30-day agenda |
+| GET `/governance/exams` | Superadmin, principal, curriculum | Paginated readiness, search by title/course |
 | GET `/governance/request-exams` | Staff | Same safe exam metadata, assigned-course scope for teachers |
-| GET `/governance/quality` | Superadmin, principal | Six complete-data counts and at most eight samples per category |
-| GET/POST `/governance/requests` | Staff read; teacher/admin create | Own requests for teacher/admin, whole-school inbox for superadmin and principal; optional status filter and pagination |
+| GET `/governance/quality` | Superadmin, principal, curriculum | Six complete-data counts and at most eight samples per category |
+| GET/POST `/governance/requests` | Staff read; teacher/curriculum/admin create | Teachers create for assigned courses; curriculum/admin can coordinate school-wide; whole-school inbox for superadmin and principal; optional status filter and pagination |
 | POST `/governance/requests/:id/decision` | Superadmin, principal | `decision: approved/rejected`, `note` (10–1000 characters) |
 | POST `/governance/requests/:id/cancel` | Request owner | Cancel pending request |
-| GET `/governance/events` | Superadmin, principal | School events + published exam agenda; `from`/`to` date-only WIB, end exclusive, maximum 366 days; each source capped at 500 |
-| POST `/governance/events` | Superadmin, principal | Create school event |
-| PUT `/governance/events/:id` | Superadmin, principal | Update active event, requires current `version` |
-| POST `/governance/events/:id/archive` | Superadmin, principal | Soft archive, requires current `version` |
+| GET `/governance/events` | Superadmin, principal, curriculum | School events + published exam agenda; `from`/`to` date-only WIB, end exclusive, maximum 366 days; each source capped at 500 |
+| POST `/governance/events` | Superadmin, principal, curriculum | Create school academic event |
+| PUT `/governance/events/:id` | Superadmin, principal, curriculum | Update active event, requires current `version` |
+| POST `/governance/events/:id/archive` | Superadmin, principal, curriculum | Soft archive, requires current `version` |
 | GET/PUT `/governance/settings` | Superadmin, principal | Read/save school profile and reporting reference; save requires version + reason |
 | GET `/governance/settings/history` | Superadmin, principal | Last 50 version snapshots, actor name, reason and date |
-| GET `/governance/reports` | Superadmin, principal | Paginated per-course aggregates; optional `year_id`, `class_id` |
-| GET `/governance/reports/export` | Superadmin, principal | Same filters, CSV maximum 10,000 courses, spreadsheet formula protection |
+| GET `/governance/reports` | Superadmin, principal, curriculum | Paginated per-course aggregates; optional `year_id`, `class_id` |
+| GET `/governance/reports/export` | Superadmin, principal, curriculum | Same filters, CSV maximum 10,000 courses, spreadsheet formula protection |
 | GET/POST `/governance/actions` | Staff read; leaders create | Leaders see all; staff see assigned actions |
 | GET `/governance/actions/summary` | Staff | Open and overdue counts scoped to actor |
-| GET `/governance/actions/assignees` | Superadmin, principal | Active teachers and administrators |
+| GET `/governance/actions/assignees` | Superadmin, principal | Active teachers, curriculum staff, and administrators |
 | GET `/governance/actions/:id/updates` | Leader or assignee | Action history |
 | PATCH `/governance/actions/:id/status` | Leader or assignee | Versioned status change with note |
 | PATCH `/users/:id/role` | Superadmin | New `role`, `reason`, `current_password`; revokes target sessions |
@@ -84,7 +89,7 @@ The down migration first refuses rollback while any `superadmin` rows remain;
 it does not silently demote users. Remaining down steps remove governance data,
 so export required records and verify the target before a manual rollback.
 
-The development seed includes `kepala.sekolah` (principal), `arif.wicaksana` (superadmin), `dewi.kusuma`
+The development seed includes `kepala.sekolah` (principal), `kurikulum` (curriculum), `arif.wicaksana` (superadmin), `dewi.kusuma`
 (additional admin), `nanda.prasetyo` (unassigned teacher) and `alya.ramadhani`
 (unenrolled student), plus school events, schedule requests and initial settings
 history. Existing demo credential is documented in OPERATIONS. Account role,
