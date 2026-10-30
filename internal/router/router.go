@@ -95,11 +95,11 @@ func New(cfg *config.Config, db *gorm.DB) (*Engine, error) {
 	results.NewHandler(resultsService).RegisterStudentRoutes(student.Group("/results"))
 
 	staffResults := protected.Group("/results")
-	staffResults.Use(middleware.RequireRoles(string(users.RoleSuperadmin), string(users.RolePrincipal), string(users.RoleAdmin), string(users.RoleTeacher)))
+	staffResults.Use(middleware.RequireRoles(string(users.RoleSuperadmin), string(users.RolePrincipal), string(users.RoleCurriculum), string(users.RoleAdmin), string(users.RoleTeacher)))
 	results.NewHandler(resultsService).RegisterStaffRoutes(staffResults)
 
 	staffMonitoring := protected.Group("/monitoring")
-	staffMonitoring.Use(middleware.RequireRoles(string(users.RoleSuperadmin), string(users.RolePrincipal), string(users.RoleAdmin), string(users.RoleTeacher)))
+	staffMonitoring.Use(middleware.RequireRoles(string(users.RoleSuperadmin), string(users.RolePrincipal), string(users.RoleCurriculum), string(users.RoleAdmin), string(users.RoleTeacher)))
 	monitoring.NewHandler(monitoringService).RegisterRoutes(staffMonitoring)
 
 	adminAudit := protected.Group("/audit-logs")

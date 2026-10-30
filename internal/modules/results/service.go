@@ -46,7 +46,7 @@ func (s *Service) ListByExam(ctx context.Context, actor authz.Principal, examID 
 }
 
 func (s *Service) ListScoped(ctx context.Context, actor authz.Principal, filter ListFilter, page pagination.Request) ([]Response, int64, error) {
-	if err := actor.RequireRole(string(users.RoleSuperadmin), string(users.RolePrincipal), string(users.RoleAdmin), string(users.RoleTeacher)); err != nil {
+	if err := actor.RequireRole(string(users.RoleSuperadmin), string(users.RolePrincipal), string(users.RoleCurriculum), string(users.RoleAdmin), string(users.RoleTeacher)); err != nil {
 		return nil, 0, err
 	}
 	if filter.ExamID != "" {
@@ -97,7 +97,7 @@ func (s *Service) ExportByExam(ctx context.Context, actor authz.Principal, examI
 }
 
 func (s *Service) PublishByExam(ctx context.Context, actor authz.Principal, examID string) (int64, error) {
-	if actor.Role != string(users.RoleTeacher) {
+	if !actor.IsTeachingStaff() {
 		return 0, apperror.New(http.StatusForbidden, "RESULT_PUBLISH_DENIED", "Hanya guru yang ditugaskan dapat mempublikasikan hasil")
 	}
 	courseID, err := s.repository.ExamCourseID(ctx, examID)

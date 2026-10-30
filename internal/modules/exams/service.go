@@ -58,7 +58,7 @@ func (s *Service) List(ctx context.Context, actor authz.Principal, courseID stri
 		if err := s.academics.RequireCourseManager(ctx, actor, courseID); err != nil {
 			return nil, 0, err
 		}
-	} else if err := actor.RequireRole(string(users.RoleSuperadmin), string(users.RolePrincipal), string(users.RoleAdmin), string(users.RoleTeacher)); err != nil {
+	} else if err := actor.RequireRole(string(users.RoleSuperadmin), string(users.RolePrincipal), string(users.RoleCurriculum), string(users.RoleAdmin), string(users.RoleTeacher)); err != nil {
 		return nil, 0, err
 	}
 	filter := ListFilter{Role: actor.Role, UserID: actor.UserID}
@@ -206,7 +206,7 @@ func (s *Service) mutableExam(ctx context.Context, actor authz.Principal, id str
 }
 
 func requireTeacher(actor authz.Principal) error {
-	if actor.Role != string(users.RoleTeacher) {
+	if !actor.IsTeachingStaff() {
 		return apperror.New(http.StatusForbidden, "EXAM_WRITE_DENIED", "Hanya guru yang ditugaskan dapat mengelola ujian")
 	}
 	return nil

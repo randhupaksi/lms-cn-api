@@ -27,7 +27,7 @@ func NewService(repository *Repository, academicsService academics.CourseManager
 }
 
 func (s *Service) Create(ctx context.Context, actor authz.Principal, request WriteRequest) (Response, error) {
-	if actor.Role != string(users.RoleTeacher) {
+	if !actor.IsTeachingStaff() {
 		return Response{}, apperror.New(http.StatusForbidden, "QUESTION_WRITE_DENIED", "Hanya guru yang ditugaskan dapat membuat soal")
 	}
 	if err := s.academics.RequireCourseManager(ctx, actor, request.CourseID); err != nil {
@@ -58,7 +58,7 @@ func (s *Service) List(ctx context.Context, actor authz.Principal, courseID stri
 		if err := s.academics.RequireCourseManager(ctx, actor, courseID); err != nil {
 			return nil, 0, err
 		}
-	} else if err := actor.RequireRole(string(users.RoleSuperadmin), string(users.RoleAdmin), string(users.RoleTeacher)); err != nil {
+	} else if err := actor.RequireRole(string(users.RoleSuperadmin), string(users.RoleAdmin), string(users.RoleTeacher), string(users.RoleCurriculum)); err != nil {
 		return nil, 0, err
 	}
 	filter.Category = strings.TrimSpace(filter.Category)
@@ -79,7 +79,7 @@ func (s *Service) List(ctx context.Context, actor authz.Principal, courseID stri
 }
 
 func (s *Service) Update(ctx context.Context, actor authz.Principal, id string, request WriteRequest) (Response, error) {
-	if actor.Role != string(users.RoleTeacher) {
+	if !actor.IsTeachingStaff() {
 		return Response{}, apperror.New(http.StatusForbidden, "QUESTION_WRITE_DENIED", "Hanya guru yang ditugaskan dapat mengubah soal")
 	}
 	current, err := s.repository.Find(ctx, id)
@@ -111,7 +111,7 @@ func (s *Service) Update(ctx context.Context, actor authz.Principal, id string, 
 }
 
 func (s *Service) Archive(ctx context.Context, actor authz.Principal, id string) error {
-	if actor.Role != string(users.RoleTeacher) {
+	if !actor.IsTeachingStaff() {
 		return apperror.New(http.StatusForbidden, "QUESTION_WRITE_DENIED", "Hanya guru yang ditugaskan dapat mengarsipkan soal")
 	}
 	question, err := s.repository.Find(ctx, id)

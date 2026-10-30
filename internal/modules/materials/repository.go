@@ -55,7 +55,7 @@ func (r *Repository) ListPaged(ctx context.Context, courseID, role, userID strin
 		Select("m.*, c.name AS course_name").
 		Joins("JOIN courses c ON c.id = m.course_id")
 	switch role {
-	case "teacher":
+	case "teacher", "curriculum":
 		query = query.Joins("JOIN course_teachers ct ON ct.course_id = m.course_id AND ct.teacher_id = ?", userID)
 	case "student":
 		query = query.Joins("JOIN course_students cs ON cs.course_id = m.course_id AND cs.student_id = ?", userID).

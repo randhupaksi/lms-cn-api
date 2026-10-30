@@ -45,7 +45,7 @@ func (r *Repository) ListScoped(ctx context.Context, role, userID string, filter
 		Joins("JOIN exams e ON e.id = r.exam_id").
 		Joins("JOIN courses c ON c.id = e.course_id").
 		Joins("JOIN users u ON u.id = r.student_id")
-	if role == "teacher" {
+	if role == "teacher" || role == "curriculum" {
 		query = query.Joins("JOIN course_teachers ct ON ct.course_id = e.course_id AND ct.teacher_id = ?", userID)
 	}
 	if filter.CourseID != "" {

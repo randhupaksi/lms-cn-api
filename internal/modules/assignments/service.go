@@ -58,7 +58,7 @@ func (s *Service) ListPaged(ctx context.Context, actor authz.Principal, courseID
 		} else if err := s.academics.RequireCourseManager(ctx, actor, courseID); err != nil {
 			return nil, 0, err
 		}
-	} else if err := actor.RequireRole(string(users.RoleSuperadmin), string(users.RolePrincipal), string(users.RoleAdmin), string(users.RoleTeacher), string(users.RoleStudent)); err != nil {
+	} else if err := actor.RequireRole(string(users.RoleSuperadmin), string(users.RolePrincipal), string(users.RoleCurriculum), string(users.RoleAdmin), string(users.RoleTeacher), string(users.RoleStudent)); err != nil {
 		return nil, 0, err
 	}
 	filter.Search = strings.TrimSpace(filter.Search)
@@ -80,7 +80,7 @@ func (s *Service) ListPaged(ctx context.Context, actor authz.Principal, courseID
 }
 
 func (s *Service) Create(ctx context.Context, actor authz.Principal, request WriteRequest) (Response, error) {
-	if actor.Role != "teacher" {
+	if !actor.IsTeachingStaff() {
 		return Response{}, apperror.New(http.StatusForbidden, "ASSIGNMENT_WRITE_DENIED", "Hanya guru yang ditugaskan dapat mengelola tugas")
 	}
 	if err := s.academics.RequireCourseManager(ctx, actor, request.CourseID); err != nil {
@@ -190,7 +190,7 @@ func (s *Service) Grade(ctx context.Context, actor authz.Principal, submissionID
 	if err != nil {
 		return mapError(err)
 	}
-	if actor.Role != "teacher" {
+	if !actor.IsTeachingStaff() {
 		return apperror.New(http.StatusForbidden, "ASSIGNMENT_GRADE_DENIED", "Hanya guru yang ditugaskan dapat memberi nilai")
 	}
 	if err := s.academics.RequireCourseManager(ctx, actor, assignment.CourseID); err != nil {
@@ -207,7 +207,7 @@ func (s *Service) Grade(ctx context.Context, actor authz.Principal, submissionID
 }
 
 func (s *Service) requireTeacherOwner(ctx context.Context, actor authz.Principal, id string) (Assignment, error) {
-	if actor.Role != "teacher" {
+	if !actor.IsTeachingStaff() {
 		return Assignment{}, apperror.New(http.StatusForbidden, "ASSIGNMENT_WRITE_DENIED", "Hanya guru yang ditugaskan dapat mengelola tugas")
 	}
 	assignment, err := s.repository.Find(ctx, id)

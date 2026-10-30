@@ -38,7 +38,7 @@ func (r *Repository) List(ctx context.Context, courseID string, page pagination.
 	query := r.db.WithContext(ctx).Model(&Question{}).Where("course_id = ?", courseID)
 	if courseID == "" {
 		query = r.db.WithContext(ctx).Model(&Question{})
-		if len(scope) >= 2 && scope[0] == "teacher" {
+		if len(scope) >= 2 && (scope[0] == "teacher" || scope[0] == "curriculum") {
 			query = query.Joins("JOIN course_teachers ct ON ct.course_id = questions.course_id AND ct.teacher_id = ?", scope[1])
 		}
 	}
