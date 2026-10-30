@@ -18,6 +18,16 @@ func (p Principal) IsSchoolAdmin() bool {
 	return p.Role == "admin" || p.Role == "superadmin" || p.Role == "principal"
 }
 
+// IsTeachingStaff identifies staff who may author content only after course assignment.
+func (p Principal) IsTeachingStaff() bool {
+	return p.Role == "teacher" || p.Role == "curriculum"
+}
+
+// CanCoordinateAcademics identifies the school-wide academic coordination scope.
+func (p Principal) CanCoordinateAcademics() bool {
+	return p.IsSchoolAdmin() || p.Role == "curriculum"
+}
+
 func (p Principal) RequireRole(roles ...string) error {
 	for _, role := range roles {
 		if p.Role == role {

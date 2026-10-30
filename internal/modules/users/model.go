@@ -7,6 +7,7 @@ type Role string
 const (
 	RoleSuperadmin Role = "superadmin"
 	RolePrincipal  Role = "principal"
+	RoleCurriculum Role = "curriculum"
 	RoleAdmin      Role = "admin"
 	RoleTeacher    Role = "teacher"
 	RoleStudent    Role = "student"

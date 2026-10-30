@@ -7,10 +7,10 @@ import (
 )
 
 func TestAdministrativeTargetBoundary(t *testing.T) {
-	for _, actor := range []Role{RoleSuperadmin, RolePrincipal, RoleAdmin, RoleTeacher, RoleStudent} {
-		for _, target := range []Role{RoleSuperadmin, RolePrincipal, RoleAdmin, RoleTeacher, RoleStudent} {
+	for _, actor := range []Role{RoleSuperadmin, RolePrincipal, RoleCurriculum, RoleAdmin, RoleTeacher, RoleStudent} {
+		for _, target := range []Role{RoleSuperadmin, RolePrincipal, RoleCurriculum, RoleAdmin, RoleTeacher, RoleStudent} {
 			allowed := actor == RoleSuperadmin ||
-				(actor == RolePrincipal && (target == RoleAdmin || target == RoleTeacher || target == RoleStudent)) ||
+				(actor == RolePrincipal && (target == RoleCurriculum || target == RoleAdmin || target == RoleTeacher || target == RoleStudent)) ||
 				(actor == RoleAdmin && (target == RoleTeacher || target == RoleStudent))
 			err := canManageTarget(authz.Principal{Role: string(actor)}, User{Role: target})
 			if (err == nil) != allowed {

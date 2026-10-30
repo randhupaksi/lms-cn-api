@@ -34,7 +34,10 @@ func (s *Service) Create(ctx context.Context, actor authz.Principal, request Cre
 	if request.Role == RoleAdmin && actor.Role == string(RoleAdmin) {
 		return Response{}, apperror.New(http.StatusForbidden, "ROLE_ASSIGNMENT_DENIED", "Hanya superadmin atau kepala sekolah dapat membuat administrator")
 	}
-	if request.Role != RolePrincipal && request.Role != RoleAdmin && request.Role != RoleTeacher && request.Role != RoleStudent {
+	if request.Role == RoleCurriculum && actor.Role != string(RoleSuperadmin) && actor.Role != string(RolePrincipal) {
+		return Response{}, apperror.New(http.StatusForbidden, "ROLE_ASSIGNMENT_DENIED", "Hanya superadmin atau kepala sekolah dapat membuat akun guru kurikulum")
+	}
+	if request.Role != RolePrincipal && request.Role != RoleCurriculum && request.Role != RoleAdmin && request.Role != RoleTeacher && request.Role != RoleStudent {
 		return Response{}, apperror.New(422, "INVALID_CREATE_ROLE", "Role akun baru tidak valid")
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(request.TemporaryPassword), bcrypt.DefaultCost)
@@ -59,7 +62,7 @@ func (s *Service) List(ctx context.Context, actor authz.Principal, page paginati
 	if err := actor.RequireRole(string(RoleSuperadmin), string(RolePrincipal), string(RoleAdmin)); err != nil {
 		return nil, 0, err
 	}
-	if actor.Role == string(RolePrincipal) && role != "" && role != string(RoleAdmin) && role != string(RoleTeacher) && role != string(RoleStudent) {
+	if actor.Role == string(RolePrincipal) && role != "" && role != string(RoleCurriculum) && role != string(RoleAdmin) && role != string(RoleTeacher) && role != string(RoleStudent) {
 		return nil, 0, apperror.New(http.StatusForbidden, "ROLE_ACCESS_DENIED", "Kepala sekolah hanya dapat melihat akun operasional sekolah")
 	}
 	if actor.Role == string(RoleAdmin) && role != "" && role != string(RoleTeacher) && role != string(RoleStudent) {
@@ -142,7 +145,7 @@ func (s *Service) ResetCredential(ctx context.Context, actor authz.Principal, id
 
 func canManageTarget(actor authz.Principal, target User) error {
 	if actor.Role == string(RoleSuperadmin) ||
-		(actor.Role == string(RolePrincipal) && (target.Role == RoleAdmin || target.Role == RoleTeacher || target.Role == RoleStudent)) ||
+		(actor.Role == string(RolePrincipal) && (target.Role == RoleCurriculum || target.Role == RoleAdmin || target.Role == RoleTeacher || target.Role == RoleStudent)) ||
 		(actor.Role == string(RoleAdmin) && (target.Role == RoleTeacher || target.Role == RoleStudent)) {
 		return nil
 	}

@@ -55,7 +55,7 @@ func (r *Repository) List(ctx context.Context, page pagination.Request, search, 
 	switch actorRole {
 	case RoleSuperadmin:
 	case RolePrincipal:
-		query = query.Where("role IN ?", []Role{RoleAdmin, RoleTeacher, RoleStudent})
+		query = query.Where("role IN ?", []Role{RoleCurriculum, RoleAdmin, RoleTeacher, RoleStudent})
 	default:
 		query = query.Where("role IN ?", []Role{RoleTeacher, RoleStudent})
 	}
@@ -63,7 +63,9 @@ func (r *Repository) List(ctx context.Context, page pagination.Request, search, 
 		like := "%" + search + "%"
 		query = query.Where("identifier LIKE ? OR full_name LIKE ?", like, like)
 	}
-	if role != "" {
+	if role == "teaching_staff" {
+		query = query.Where("role IN ?", []Role{RoleTeacher, RoleCurriculum})
+	} else if role != "" {
 		query = query.Where("role = ?", role)
 	}
 	var total int64
@@ -107,7 +109,7 @@ func (r *Repository) Mutate(ctx context.Context, id string, revoke bool, apply f
 
 func (r *Repository) HasAcademicRecords(ctx context.Context, user User) (bool, error) {
 	var count int64
-	if user.Role == RoleTeacher {
+	if user.Role == RoleTeacher || user.Role == RoleCurriculum {
 		err := r.db.WithContext(ctx).Raw(`SELECT (SELECT COUNT(*) FROM course_teachers WHERE teacher_id = ?) + (SELECT COUNT(*) FROM questions WHERE author_id = ?) + (SELECT COUNT(*) FROM exams WHERE author_id = ?) + (SELECT COUNT(*) FROM course_materials WHERE author_id = ?) + (SELECT COUNT(*) FROM assignments WHERE author_id = ?) + (SELECT COUNT(*) FROM assignment_submissions WHERE graded_by = ?) AS total`, user.ID, user.ID, user.ID, user.ID, user.ID, user.ID).Scan(&count).Error
 		return count > 0, err
 	}
