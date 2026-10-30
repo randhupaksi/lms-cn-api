@@ -27,7 +27,7 @@ func NewService(repository *Repository, auditRecorder audit.Recorder) *Service {
 }
 
 func (s *Service) CreateAcademicYear(ctx context.Context, actor authz.Principal, request CreateAcademicYearRequest) (AcademicYearResponse, error) {
-	if err := actor.RequireRole(string(users.RoleSuperadmin), string(users.RolePrincipal), string(users.RoleAdmin)); err != nil {
+	if err := actor.RequireRole(string(users.RoleSuperadmin), string(users.RolePrincipal), string(users.RoleCurriculum), string(users.RoleAdmin)); err != nil {
 		return AcademicYearResponse{}, err
 	}
 	startsOn, _ := time.Parse("2006-01-02", request.StartsOn)
@@ -44,7 +44,7 @@ func (s *Service) CreateAcademicYear(ctx context.Context, actor authz.Principal,
 }
 
 func (s *Service) ListAcademicYears(ctx context.Context, actor authz.Principal) ([]AcademicYearResponse, error) {
-	if err := actor.RequireRole(string(users.RoleSuperadmin), string(users.RolePrincipal), string(users.RoleAdmin), string(users.RoleTeacher)); err != nil {
+	if err := actor.RequireRole(string(users.RoleSuperadmin), string(users.RolePrincipal), string(users.RoleCurriculum), string(users.RoleAdmin), string(users.RoleTeacher)); err != nil {
 		return nil, err
 	}
 	values, err := s.repository.ListAcademicYears(ctx)
@@ -59,7 +59,7 @@ func (s *Service) ListAcademicYears(ctx context.Context, actor authz.Principal) 
 }
 
 func (s *Service) CreateClassGroup(ctx context.Context, actor authz.Principal, request CreateClassGroupRequest) (ClassGroupResponse, error) {
-	if err := actor.RequireRole(string(users.RoleSuperadmin), string(users.RolePrincipal), string(users.RoleAdmin)); err != nil {
+	if err := actor.RequireRole(string(users.RoleSuperadmin), string(users.RolePrincipal), string(users.RoleCurriculum), string(users.RoleAdmin)); err != nil {
 		return ClassGroupResponse{}, err
 	}
 	value := ClassGroup{ID: uuid.NewString(), AcademicYearID: request.AcademicYearID, Name: strings.TrimSpace(request.Name), GradeLevel: request.GradeLevel}
@@ -71,7 +71,7 @@ func (s *Service) CreateClassGroup(ctx context.Context, actor authz.Principal, r
 }
 
 func (s *Service) ListClassGroups(ctx context.Context, actor authz.Principal, yearID string) ([]ClassGroupResponse, error) {
-	if err := actor.RequireRole(string(users.RoleSuperadmin), string(users.RolePrincipal), string(users.RoleAdmin), string(users.RoleTeacher)); err != nil {
+	if err := actor.RequireRole(string(users.RoleSuperadmin), string(users.RolePrincipal), string(users.RoleCurriculum), string(users.RoleAdmin), string(users.RoleTeacher)); err != nil {
 		return nil, err
 	}
 	values, err := s.repository.ListClassGroups(ctx, yearID)
@@ -86,7 +86,7 @@ func (s *Service) ListClassGroups(ctx context.Context, actor authz.Principal, ye
 }
 
 func (s *Service) CreateSubject(ctx context.Context, actor authz.Principal, request CreateSubjectRequest) (SubjectResponse, error) {
-	if err := actor.RequireRole(string(users.RoleSuperadmin), string(users.RolePrincipal), string(users.RoleAdmin)); err != nil {
+	if err := actor.RequireRole(string(users.RoleSuperadmin), string(users.RolePrincipal), string(users.RoleCurriculum), string(users.RoleAdmin)); err != nil {
 		return SubjectResponse{}, err
 	}
 	value := Subject{ID: uuid.NewString(), Code: strings.ToUpper(strings.TrimSpace(request.Code)), Name: strings.TrimSpace(request.Name)}
@@ -98,7 +98,7 @@ func (s *Service) CreateSubject(ctx context.Context, actor authz.Principal, requ
 }
 
 func (s *Service) ListSubjects(ctx context.Context, actor authz.Principal) ([]SubjectResponse, error) {
-	if err := actor.RequireRole(string(users.RoleSuperadmin), string(users.RolePrincipal), string(users.RoleAdmin), string(users.RoleTeacher)); err != nil {
+	if err := actor.RequireRole(string(users.RoleSuperadmin), string(users.RolePrincipal), string(users.RoleCurriculum), string(users.RoleAdmin), string(users.RoleTeacher)); err != nil {
 		return nil, err
 	}
 	values, err := s.repository.ListSubjects(ctx)
@@ -113,7 +113,7 @@ func (s *Service) ListSubjects(ctx context.Context, actor authz.Principal) ([]Su
 }
 
 func (s *Service) CreateCourse(ctx context.Context, actor authz.Principal, request CreateCourseRequest) (CourseResponse, error) {
-	if err := actor.RequireRole(string(users.RoleSuperadmin), string(users.RolePrincipal), string(users.RoleAdmin)); err != nil {
+	if err := actor.RequireRole(string(users.RoleSuperadmin), string(users.RolePrincipal), string(users.RoleCurriculum), string(users.RoleAdmin)); err != nil {
 		return CourseResponse{}, err
 	}
 	value := Course{ID: uuid.NewString(), AcademicYearID: request.AcademicYearID, ClassGroupID: request.ClassGroupID, SubjectID: request.SubjectID, Name: strings.TrimSpace(request.Name), Status: "active"}
@@ -141,7 +141,7 @@ func (s *Service) ListCourses(ctx context.Context, actor authz.Principal, page p
 }
 
 func (s *Service) AssignTeachers(ctx context.Context, actor authz.Principal, courseID string, userIDs []string) error {
-	if err := actor.RequireRole(string(users.RoleSuperadmin), string(users.RolePrincipal), string(users.RoleAdmin)); err != nil {
+	if err := actor.RequireRole(string(users.RoleSuperadmin), string(users.RolePrincipal), string(users.RoleCurriculum), string(users.RoleAdmin)); err != nil {
 		return err
 	}
 	if err := s.repository.ReplaceTeachers(ctx, courseID, userIDs); err != nil {
@@ -184,7 +184,7 @@ func (s *Service) RequireCourseManager(ctx context.Context, actor authz.Principa
 	if actor.IsSchoolAdmin() {
 		return nil
 	}
-	if actor.Role != string(users.RoleTeacher) {
+	if !actor.IsTeachingStaff() {
 		return apperror.New(http.StatusForbidden, "COURSE_ACCESS_DENIED", "Course tidak tersedia untuk akun ini")
 	}
 	allowed, err := s.repository.IsTeacherAssigned(ctx, courseID, actor.UserID)

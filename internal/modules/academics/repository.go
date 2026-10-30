@@ -64,7 +64,7 @@ func (r *Repository) FindCourse(ctx context.Context, id string) (Course, error) 
 func (r *Repository) ListCourses(ctx context.Context, principalRole, userID string, page pagination.Request, searches ...string) ([]Course, int64, error) {
 	query := r.db.WithContext(ctx).Model(&Course{})
 	switch principalRole {
-	case string(users.RoleTeacher):
+	case string(users.RoleTeacher), string(users.RoleCurriculum):
 		query = query.Joins("JOIN course_teachers ct ON ct.course_id = courses.id AND ct.teacher_id = ?", userID)
 	case string(users.RoleStudent):
 		query = query.Joins("JOIN course_students cs ON cs.course_id = courses.id AND cs.student_id = ?", userID)
@@ -87,11 +87,11 @@ func (r *Repository) ListCourses(ctx context.Context, principalRole, userID stri
 }
 
 func (r *Repository) ReplaceTeachers(ctx context.Context, courseID string, userIDs []string) error {
-	return r.replaceMembers(ctx, "course_teachers", "teacher_id", string(users.RoleTeacher), courseID, userIDs)
+	return r.replaceMembers(ctx, "course_teachers", "teacher_id", courseID, userIDs, []users.Role{users.RoleTeacher, users.RoleCurriculum})
 }
 
 func (r *Repository) ReplaceStudents(ctx context.Context, courseID string, userIDs []string) error {
-	return r.replaceMembers(ctx, "course_students", "student_id", string(users.RoleStudent), courseID, userIDs)
+	return r.replaceMembers(ctx, "course_students", "student_id", courseID, userIDs, []users.Role{users.RoleStudent})
 }
 
 func (r *Repository) CourseMembers(ctx context.Context, courseID string) ([]users.User, []users.User, error) {
@@ -106,10 +106,10 @@ func (r *Repository) CourseMembers(ctx context.Context, courseID string) ([]user
 	return teachers, students, nil
 }
 
-func (r *Repository) replaceMembers(ctx context.Context, table, userColumn, role, courseID string, userIDs []string) error {
+func (r *Repository) replaceMembers(ctx context.Context, table, userColumn, courseID string, userIDs []string, acceptedRoles []users.Role) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
-		if err := tx.Model(&users.User{}).Where("id IN ? AND role = ? AND status = ?", userIDs, role, users.StatusActive).Count(&count).Error; err != nil {
+		if err := tx.Model(&users.User{}).Where("id IN ? AND role IN ? AND status = ?", userIDs, acceptedRoles, users.StatusActive).Count(&count).Error; err != nil {
 			return err
 		}
 		if count != int64(len(userIDs)) {
