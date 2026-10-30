@@ -24,14 +24,22 @@ func (h *Handler) RegisterPublicRoutes(group *gin.RouterGroup) {
 	group.GET("/school-profile", func(c *gin.Context) { value, err := h.service.PublicProfile(c.Request.Context()); reply(c, value, err) })
 }
 func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
-	group.Use(middleware.RequireRoles("superadmin", "admin", "teacher"))
+	group.Use(middleware.RequireRoles("superadmin", "principal", "admin", "teacher"))
 	group.GET("/requests", h.requests)
 	group.POST("/requests", h.createRequest)
 	group.POST("/requests/:id/decision", h.decide)
 	group.POST("/requests/:id/cancel", h.cancel)
 	group.GET("/request-exams", h.exams)
+	actions := group.Group("/actions")
+	actions.Use(middleware.RequireRoles("superadmin", "principal", "admin", "teacher"))
+	actions.GET("", h.leadershipActions)
+	actions.GET("/summary", h.leadershipActionSummary)
+	actions.GET("/assignees", h.leadershipActionAssignees)
+	actions.POST("", h.createLeadershipAction)
+	actions.GET("/:id/updates", h.leadershipActionUpdates)
+	actions.PATCH("/:id/status", h.updateLeadershipActionStatus)
 	owner := group.Group("")
-	owner.Use(middleware.RequireRoles("superadmin"))
+	owner.Use(middleware.RequireRoles("superadmin", "principal"))
 	owner.GET("/overview", h.overview)
 	owner.GET("/exams", h.exams)
 	owner.GET("/quality", h.quality)
@@ -44,6 +52,85 @@ func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
 	owner.POST("/events", h.createEvent)
 	owner.PUT("/events/:id", h.updateEvent)
 	owner.POST("/events/:id/archive", h.archive)
+}
+
+func (h *Handler) leadershipActions(c *gin.Context) {
+	a, _ := middleware.Principal(c)
+	p := pagination.FromContext(c)
+	data, total, err := h.service.ListLeadershipActions(c.Request.Context(), a, c.Query("status"), c.Query("category"), p.Page, p.PerPage)
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.SuccessWithMeta(c, http.StatusOK, "Tindak lanjut berhasil dimuat", data, p.Meta(total))
+}
+
+func (h *Handler) leadershipActionSummary(c *gin.Context) {
+	a, _ := middleware.Principal(c)
+	open, overdue, err := h.service.LeadershipActionCounts(c.Request.Context(), a)
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Ringkasan tindak lanjut berhasil dimuat", gin.H{"open": open, "overdue": overdue})
+}
+
+func (h *Handler) leadershipActionAssignees(c *gin.Context) {
+	a, _ := middleware.Principal(c)
+	data, err := h.service.ActionAssignees(c.Request.Context(), a)
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Daftar penanggung jawab berhasil dimuat", data)
+}
+
+func (h *Handler) createLeadershipAction(c *gin.Context) {
+	var body CreateLeadershipActionInput
+	if err := request.BindJSON(c, &body); err != nil {
+		response.FromError(c, err)
+		return
+	}
+	a, _ := middleware.Principal(c)
+	if err := h.service.CreateLeadershipAction(c.Request.Context(), a, body); err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.Success(c, http.StatusCreated, "Tindak lanjut berhasil dibuat", nil)
+}
+
+func (h *Handler) updateLeadershipActionStatus(c *gin.Context) {
+	id, err := request.RequireID(c, "id")
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	var body UpdateLeadershipActionStatusInput
+	if err := request.BindJSON(c, &body); err != nil {
+		response.FromError(c, err)
+		return
+	}
+	a, _ := middleware.Principal(c)
+	if err := h.service.UpdateLeadershipActionStatus(c.Request.Context(), a, id, body); err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Status tindak lanjut berhasil diperbarui", nil)
+}
+
+func (h *Handler) leadershipActionUpdates(c *gin.Context) {
+	id, err := request.RequireID(c, "id")
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	a, _ := middleware.Principal(c)
+	data, err := h.service.LeadershipActionUpdates(c.Request.Context(), a, id)
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Riwayat tindak lanjut berhasil dimuat", data)
 }
 func reply(c *gin.Context, data any, err error) {
 	if err != nil {

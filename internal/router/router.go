@@ -79,7 +79,7 @@ func New(cfg *config.Config, db *gorm.DB) (*Engine, error) {
 	authHandler.RegisterProtectedRoutes(protected.Group("/auth"))
 
 	adminUsers := protected.Group("/users")
-	adminUsers.Use(middleware.RequireRoles(string(users.RoleSuperadmin), string(users.RoleAdmin)))
+	adminUsers.Use(middleware.RequireRoles(string(users.RoleSuperadmin), string(users.RolePrincipal), string(users.RoleAdmin)))
 	users.NewHandler(usersService).RegisterRoutes(adminUsers)
 	academics.NewHandler(academicsService).RegisterRoutes(protected)
 	questions.NewHandler(questionsService).RegisterRoutes(protected.Group("/questions"))
@@ -95,15 +95,15 @@ func New(cfg *config.Config, db *gorm.DB) (*Engine, error) {
 	results.NewHandler(resultsService).RegisterStudentRoutes(student.Group("/results"))
 
 	staffResults := protected.Group("/results")
-	staffResults.Use(middleware.RequireRoles(string(users.RoleSuperadmin), string(users.RoleAdmin), string(users.RoleTeacher)))
+	staffResults.Use(middleware.RequireRoles(string(users.RoleSuperadmin), string(users.RolePrincipal), string(users.RoleAdmin), string(users.RoleTeacher)))
 	results.NewHandler(resultsService).RegisterStaffRoutes(staffResults)
 
 	staffMonitoring := protected.Group("/monitoring")
-	staffMonitoring.Use(middleware.RequireRoles(string(users.RoleSuperadmin), string(users.RoleAdmin), string(users.RoleTeacher)))
+	staffMonitoring.Use(middleware.RequireRoles(string(users.RoleSuperadmin), string(users.RolePrincipal), string(users.RoleAdmin), string(users.RoleTeacher)))
 	monitoring.NewHandler(monitoringService).RegisterRoutes(staffMonitoring)
 
 	adminAudit := protected.Group("/audit-logs")
-	adminAudit.Use(middleware.RequireRoles(string(users.RoleSuperadmin), string(users.RoleAdmin)))
+	adminAudit.Use(middleware.RequireRoles(string(users.RoleSuperadmin), string(users.RolePrincipal), string(users.RoleAdmin)))
 	audit.NewHandler(auditService).RegisterRoutes(adminAudit)
 
 	return &Engine{Engine: engine, ExpiryWorker: attempts.NewExpiryWorker(attemptsService, 15*time.Second)}, nil

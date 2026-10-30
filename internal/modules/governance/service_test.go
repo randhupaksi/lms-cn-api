@@ -58,6 +58,9 @@ func TestDecisionIntegrity(t *testing.T) {
 func TestAuthorizationBeforeRepository(t *testing.T) {
 	s := NewService(nil, nil)
 	ctx := context.Background()
+	if err := owner(authz.Principal{Role: "principal"}); err != nil {
+		t.Fatal("principal should share school governance access")
+	}
 	for _, role := range []string{"student", "teacher", "admin", "unknown"} {
 		if _, err := s.Overview(ctx, authz.Principal{Role: role}); err == nil {
 			t.Fatalf("overview admitted %s", role)

@@ -1,7 +1,12 @@
 # School governance API
 
-Scope: one school, four fixed roles (`superadmin`, `admin`, `teacher`, `student`).
-Superadmin is the school governance role. Assigned teachers continue to own
+Scope: one school, five fixed roles (`superadmin`, `principal`, `admin`, `teacher`, `student`).
+Principal shares school governance, academic administration, monitoring, reports,
+and read-only audit access. Principal can manage admin, teacher, and student
+accounts. Only superadmin can create or manage principal/superadmin accounts,
+change roles, inspect sessions, and revoke sessions. Teacher ownership of
+authoring, grading, and result publication remains unchanged.
+Superadmin and principal share school governance. Assigned teachers continue to own
 content, grading, and result publication. Superadmin does not bypass those rules.
 
 ## Endpoints (prefix `/api/v1`)
@@ -9,21 +14,26 @@ content, grading, and result publication. Superadmin does not bypass those rules
 | Method / path | Actor | Behavior |
 |---|---|---|
 | GET `/school-profile` | Public | Whitelisted school name, motto, support email/message only |
-| GET `/governance/overview` | Superadmin | Whole-school counters, role distribution, global exam lifecycle, six upcoming/running exams, quality checks, 30-day agenda |
-| GET `/governance/exams` | Superadmin | Paginated readiness, search by title/course |
+| GET `/governance/overview` | Superadmin, principal | Whole-school counters, role distribution, global exam lifecycle, six upcoming/running exams, quality checks, 30-day agenda |
+| GET `/governance/exams` | Superadmin, principal | Paginated readiness, search by title/course |
 | GET `/governance/request-exams` | Staff | Same safe exam metadata, assigned-course scope for teachers |
-| GET `/governance/quality` | Superadmin | Six complete-data counts and at most eight samples per category |
-| GET/POST `/governance/requests` | Staff read; teacher/admin create | Own requests for teacher/admin, whole-school inbox for superadmin; optional status filter and pagination |
-| POST `/governance/requests/:id/decision` | Superadmin | `decision: approved/rejected`, `note` (10–1000 characters) |
+| GET `/governance/quality` | Superadmin, principal | Six complete-data counts and at most eight samples per category |
+| GET/POST `/governance/requests` | Staff read; teacher/admin create | Own requests for teacher/admin, whole-school inbox for superadmin and principal; optional status filter and pagination |
+| POST `/governance/requests/:id/decision` | Superadmin, principal | `decision: approved/rejected`, `note` (10–1000 characters) |
 | POST `/governance/requests/:id/cancel` | Request owner | Cancel pending request |
-| GET `/governance/events` | Superadmin | School events + published exam agenda; `from`/`to` date-only WIB, end exclusive, maximum 366 days; each source capped at 500 |
-| POST `/governance/events` | Superadmin | Create school event |
-| PUT `/governance/events/:id` | Superadmin | Update active event, requires current `version` |
-| POST `/governance/events/:id/archive` | Superadmin | Soft archive, requires current `version` |
-| GET/PUT `/governance/settings` | Superadmin | Read/save school profile and reporting reference; save requires version + reason |
-| GET `/governance/settings/history` | Superadmin | Last 50 version snapshots, actor name, reason and date |
-| GET `/governance/reports` | Superadmin | Paginated per-course aggregates; optional `year_id`, `class_id` |
-| GET `/governance/reports/export` | Superadmin | Same filters, CSV maximum 10,000 courses, spreadsheet formula protection |
+| GET `/governance/events` | Superadmin, principal | School events + published exam agenda; `from`/`to` date-only WIB, end exclusive, maximum 366 days; each source capped at 500 |
+| POST `/governance/events` | Superadmin, principal | Create school event |
+| PUT `/governance/events/:id` | Superadmin, principal | Update active event, requires current `version` |
+| POST `/governance/events/:id/archive` | Superadmin, principal | Soft archive, requires current `version` |
+| GET/PUT `/governance/settings` | Superadmin, principal | Read/save school profile and reporting reference; save requires version + reason |
+| GET `/governance/settings/history` | Superadmin, principal | Last 50 version snapshots, actor name, reason and date |
+| GET `/governance/reports` | Superadmin, principal | Paginated per-course aggregates; optional `year_id`, `class_id` |
+| GET `/governance/reports/export` | Superadmin, principal | Same filters, CSV maximum 10,000 courses, spreadsheet formula protection |
+| GET/POST `/governance/actions` | Staff read; leaders create | Leaders see all; staff see assigned actions |
+| GET `/governance/actions/summary` | Staff | Open and overdue counts scoped to actor |
+| GET `/governance/actions/assignees` | Superadmin, principal | Active teachers and administrators |
+| GET `/governance/actions/:id/updates` | Leader or assignee | Action history |
+| PATCH `/governance/actions/:id/status` | Leader or assignee | Versioned status change with note |
 | PATCH `/users/:id/role` | Superadmin | New `role`, `reason`, `current_password`; revokes target sessions |
 | GET `/users/:id/sessions` | Superadmin | At most 100 active session IDs and timestamps, no hashes/tokens |
 | POST `/users/:id/revoke-sessions` | Superadmin | Revoke target sessions and record audit atomically |
@@ -33,6 +43,14 @@ JSON are RFC3339; user-facing dates are WIB. Event categories are `academic`,
 `holiday`, `meeting`, `announcement`; exam agenda entries are derived/read-only.
 
 ## Invariants
+
+- Leadership actions are created by principal or superadmin and may be assigned
+  to an active teacher or administrator. Assigned staff can read their own
+  actions and record progress; leaders can see all actions and reopen or cancel
+  them. Each status change requires a note and current version, and is audited.
+- Migration `000007_principal_leadership_actions` adds the role and action
+  history. Before rollback, export action history and remove or change every
+  principal role; rollback drops the action tables.
 
 - Normal admin can list/mutate teacher/student accounts only. It cannot create
   administrators or manage privileged targets by guessing IDs.
@@ -66,7 +84,7 @@ The down migration first refuses rollback while any `superadmin` rows remain;
 it does not silently demote users. Remaining down steps remove governance data,
 so export required records and verify the target before a manual rollback.
 
-The development seed includes `arif.wicaksana` (superadmin), `dewi.kusuma`
+The development seed includes `kepala.sekolah` (principal), `arif.wicaksana` (superadmin), `dewi.kusuma`
 (additional admin), `nanda.prasetyo` (unassigned teacher) and `alya.ramadhani`
 (unenrolled student), plus school events, schedule requests and initial settings
 history. Existing demo credential is documented in OPERATIONS. Account role,

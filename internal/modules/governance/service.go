@@ -25,7 +25,7 @@ type Service struct {
 func NewService(repository *Repository, courses CourseAccess) *Service {
 	return &Service{repository: repository, courses: courses, now: time.Now}
 }
-func owner(actor authz.Principal) error { return actor.RequireRole("superadmin") }
+func owner(actor authz.Principal) error { return actor.RequireRole("superadmin", "principal") }
 
 type PublicProfile struct {
 	SchoolName     string `json:"school_name"`
@@ -38,7 +38,9 @@ func (s *Service) PublicProfile(ctx context.Context) (PublicProfile, error) {
 	v, err := s.repository.Settings(ctx)
 	return PublicProfile{SchoolName: v.SchoolName, Motto: v.Motto, ContactEmail: v.ContactEmail, SupportMessage: v.SupportMessage}, failure(err)
 }
-func staff(actor authz.Principal) error { return actor.RequireRole("superadmin", "admin", "teacher") }
+func staff(actor authz.Principal) error {
+	return actor.RequireRole("superadmin", "principal", "admin", "teacher")
+}
 func failure(err error) error {
 	if err == nil {
 		return nil
@@ -171,7 +173,7 @@ func validateDecision(value ScheduleRequest, exam ExamReadiness, actorID, status
 		return nil
 	}
 	if value.RequesterID == actorID {
-		return apperror.New(403, "SELF_APPROVAL_DENIED", "Pengajuan sendiri harus ditinjau superadmin lain")
+		return apperror.New(403, "SELF_APPROVAL_DENIED", "Pengajuan sendiri harus ditinjau pimpinan lain")
 	}
 	if status == "approved" {
 		if !value.OriginalStartsAt.Equal(exam.StartsAt) || !value.OriginalEndsAt.Equal(exam.EndsAt) {

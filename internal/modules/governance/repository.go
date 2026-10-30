@@ -96,7 +96,7 @@ func (r *Repository) Quality(ctx context.Context) ([]QualityGroup, error) {
 
 func (r *Repository) Requests(ctx context.Context, role, userID, status string, page, size int) ([]RequestRow, int64, error) {
 	q := r.db.WithContext(ctx).Table("governance_requests g").Joins("JOIN exams e ON e.id=g.exam_id").Joins("JOIN courses c ON c.id=e.course_id").Joins("JOIN users u ON u.id=g.requester_id").Joins("LEFT JOIN users v ON v.id=g.reviewer_id")
-	if role != "superadmin" {
+	if role != "superadmin" && role != "principal" {
 		q = q.Where("g.requester_id=?", userID)
 	}
 	if status != "" {
