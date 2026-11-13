@@ -40,7 +40,7 @@ func (l *RateLimiter) Middleware() gin.HandlerFunc {
 		bucket.count++
 		l.buckets[key] = bucket
 		remaining := max(0, l.limit-bucket.count)
-		resetSeconds := max(1, int(time.Until(bucket.resetsAt).Seconds()))
+		resetSeconds := max(1, int(bucket.resetsAt.Sub(now).Seconds()))
 		if len(l.buckets) > 10000 {
 			for bucketKey, candidate := range l.buckets {
 				if !now.Before(candidate.resetsAt) {

@@ -12,7 +12,11 @@
 - rate limiting for public authentication endpoints;
 - structured request logging without request bodies or tokens;
 - read-only administrative audit access;
-- explicit CORS and environment-driven secrets.
+- explicit CORS and environment-driven secrets;
+- forwarded client IP headers are trusted only from explicitly configured
+  `TRUSTED_PROXIES` addresses; an empty value disables proxy-header trust;
+- JSON request bodies are limited to 4 MiB and oversized requests receive 413;
+- password creation and change reject values beyond bcrypt's 72-byte limit.
 
 ## Required infrastructure controls
 

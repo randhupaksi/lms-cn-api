@@ -40,7 +40,9 @@ database, or private infrastructure credentials in any `NEXT_PUBLIC_*` value.
 
 Supply API secrets and environment-specific configuration at runtime through
 the deployment platform. At minimum, production requires `DATABASE_URL`, a
-unique `JWT_SECRET`, `ALLOWED_ORIGINS`, and `COOKIE_SECURE=true`. Keep
+unique `JWT_SECRET`, `ALLOWED_ORIGINS`, and `COOKIE_SECURE=true`. When the API
+is behind a reverse proxy, set `TRUSTED_PROXIES` to that proxy's exact IP
+addresses or CIDRs; an empty value ignores forwarded client-IP headers. Keep
 `SEED_DEMO_DATA=false`. The image healthcheck covers process liveness; the
 orchestrator readiness probe should use `/api/v1/health` so database failures
 stop new traffic.

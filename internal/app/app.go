@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"lms-cn-api/internal/config"
 	"lms-cn-api/internal/database"
@@ -52,7 +53,12 @@ func (s *Server) Run() error {
 	defer stop()
 	go s.engine.ExpiryWorker.Run(ctx)
 
-	httpServer := &http.Server{Addr: ":" + s.config.Port, Handler: s.engine.Engine, ReadHeaderTimeout: s.config.ShutdownTimeout}
+	httpServer := &http.Server{
+		Addr:              ":" + s.config.Port,
+		Handler:           s.engine.Engine,
+		ReadHeaderTimeout: 5 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
 	errorsChannel := make(chan error, 1)
 	go func() {
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {

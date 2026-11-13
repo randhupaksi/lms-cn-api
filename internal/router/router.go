@@ -1,6 +1,7 @@
 package router
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -37,6 +38,9 @@ func New(cfg *config.Config, db *gorm.DB) (*Engine, error) {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	engine := gin.New()
+	if err := engine.SetTrustedProxies(cfg.TrustedProxies); err != nil {
+		return nil, fmt.Errorf("configure trusted proxy addresses: %w", err)
+	}
 	engine.Use(gin.Recovery(), middleware.RequestID(), middleware.RequestLogger(), middleware.SecurityHeaders(cfg.AppEnv == "production"), middleware.CORS(cfg.AllowedOrigins), gzip.Gzip(gzip.DefaultCompression))
 
 	auditService := audit.NewService(db)

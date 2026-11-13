@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"strconv"
@@ -23,6 +24,7 @@ type Config struct {
 	AccessTokenTTL         time.Duration
 	RefreshTokenTTL        time.Duration
 	AllowedOrigins         []string
+	TrustedProxies         []string
 	CookieDomain           string
 	CookieSecure           bool
 	DatabaseMaxOpen        int
@@ -38,9 +40,12 @@ type Config struct {
 
 func Load() (*Config, error) {
 	_ = godotenv.Load()
+	if err := validateEnvironmentValues(); err != nil {
+		return nil, err
+	}
 
 	cfg := &Config{
-		AppEnv:                 valueOrDefault("APP_ENV", "development"),
+		AppEnv:                 strings.ToLower(valueOrDefault("APP_ENV", "development")),
 		Port:                   valueOrDefault("PORT", "8080"),
 		APIPrefix:              valueOrDefault("API_PREFIX", "/api/v1"),
 		AppName:                valueOrDefault("APP_NAME", "Citra Negara LMS API"),
@@ -50,6 +55,7 @@ func Load() (*Config, error) {
 		AccessTokenTTL:         durationOrDefault("ACCESS_TOKEN_TTL", 24*time.Hour),
 		RefreshTokenTTL:        durationOrDefault("REFRESH_TOKEN_TTL", 7*24*time.Hour),
 		AllowedOrigins:         csvOrDefault("ALLOWED_ORIGINS", []string{"http://localhost:3000"}),
+		TrustedProxies:         csvOrEmpty("TRUSTED_PROXIES"),
 		CookieDomain:           strings.TrimSpace(os.Getenv("COOKIE_DOMAIN")),
 		CookieSecure:           boolOrDefault("COOKIE_SECURE", false),
 		DatabaseMaxOpen:        intOrDefault("DATABASE_MAX_OPEN", 50),
@@ -71,6 +77,11 @@ func Load() (*Config, error) {
 }
 
 func (c *Config) validate() error {
+	switch c.AppEnv {
+	case "development", "test", "staging", "production":
+	default:
+		return errors.New("APP_ENV must be development, test, staging, or production")
+	}
 	var missing []string
 	if c.DatabaseURL == "" {
 		missing = append(missing, "DATABASE_URL")
@@ -92,6 +103,24 @@ func (c *Config) validate() error {
 	}
 	if !strings.HasPrefix(c.APIPrefix, "/") {
 		return errors.New("API_PREFIX must start with a slash")
+	}
+	if c.Port != "" {
+		port, err := strconv.Atoi(c.Port)
+		if err != nil || port < 1 || port > 65535 {
+			return errors.New("PORT must be an integer between 1 and 65535")
+		}
+	}
+	for _, proxy := range c.TrustedProxies {
+		if proxy == "0.0.0.0/0" || proxy == "::/0" {
+			return errors.New("TRUSTED_PROXIES must not trust every address")
+		}
+		if strings.Contains(proxy, "/") {
+			if _, _, err := net.ParseCIDR(proxy); err != nil {
+				return errors.New("TRUSTED_PROXIES must contain valid IP addresses or CIDRs")
+			}
+		} else if net.ParseIP(proxy) == nil {
+			return errors.New("TRUSTED_PROXIES must contain valid IP addresses or CIDRs")
+		}
 	}
 	if c.AppEnv == "production" {
 		if c.SeedDemoData {
@@ -120,10 +149,48 @@ func (c *Config) validate() error {
 }
 
 func valueOrDefault(key, fallback string) string {
-	if value := os.Getenv(key); value != "" {
+	if value := strings.TrimSpace(os.Getenv(key)); value != "" {
 		return value
 	}
 	return fallback
+}
+
+func validateEnvironmentValues() error {
+	for _, key := range []string{
+		"ACCESS_TOKEN_TTL", "REFRESH_TOKEN_TTL", "DATABASE_MAX_LIFETIME",
+		"SHUTDOWN_TIMEOUT", "LOGIN_RATE_WINDOW", "LOGIN_ACCOUNT_RATE_WINDOW",
+	} {
+		value := strings.TrimSpace(os.Getenv(key))
+		if value == "" {
+			continue
+		}
+		parsed, err := time.ParseDuration(value)
+		if err != nil || parsed <= 0 {
+			return fmt.Errorf("%s must be a positive duration", key)
+		}
+	}
+	for _, key := range []string{
+		"DATABASE_MAX_OPEN", "DATABASE_MAX_IDLE", "LOGIN_RATE_LIMIT", "LOGIN_ACCOUNT_RATE_LIMIT",
+	} {
+		value := strings.TrimSpace(os.Getenv(key))
+		if value == "" {
+			continue
+		}
+		parsed, err := strconv.Atoi(value)
+		if err != nil || parsed <= 0 {
+			return fmt.Errorf("%s must be a positive integer", key)
+		}
+	}
+	for _, key := range []string{"COOKIE_SECURE", "SEED_DEMO_DATA"} {
+		value := strings.TrimSpace(os.Getenv(key))
+		if value == "" {
+			continue
+		}
+		if _, err := strconv.ParseBool(value); err != nil {
+			return fmt.Errorf("%s must be a boolean", key)
+		}
+	}
+	return nil
 }
 
 func durationOrDefault(key string, fallback time.Duration) time.Duration {
@@ -173,6 +240,21 @@ func csvOrDefault(key string, fallback []string) []string {
 	}
 	if len(result) == 0 {
 		return fallback
+	}
+	return result
+}
+
+func csvOrEmpty(key string) []string {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return nil
+	}
+	items := strings.Split(value, ",")
+	result := make([]string, 0, len(items))
+	for _, item := range items {
+		if trimmed := strings.TrimSpace(item); trimmed != "" {
+			result = append(result, trimmed)
+		}
 	}
 	return result
 }
