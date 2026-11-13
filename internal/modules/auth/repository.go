@@ -5,11 +5,15 @@ import (
 	"errors"
 	"time"
 
+	"lms-cn-api/internal/modules/audit"
+	"lms-cn-api/internal/modules/users"
+
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
 var ErrSessionNotFound = errors.New("session not found")
+var ErrPasswordChanged = errors.New("password changed concurrently")
 
 type Repository struct{ db *gorm.DB }
 
@@ -62,7 +66,21 @@ func (r *Repository) Revoke(ctx context.Context, sessionID string, now time.Time
 		Where("id = ? AND revoked_at IS NULL", sessionID).Update("revoked_at", now).Error
 }
 
-func (r *Repository) RevokeAllForUser(ctx context.Context, userID string, now time.Time) error {
-	return r.db.WithContext(ctx).Model(&Session{}).
-		Where("user_id = ? AND revoked_at IS NULL", userID).Update("revoked_at", now).Error
+func (r *Repository) ChangePassword(ctx context.Context, userID, currentHash, nextHash string, now time.Time, event audit.Record) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		result := tx.Model(&users.User{}).Where("id = ? AND password_hash = ?", userID, currentHash).Updates(map[string]any{
+			"password_hash":        nextHash,
+			"must_change_password": false,
+		})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != 1 {
+			return ErrPasswordChanged
+		}
+		if err := tx.Model(&Session{}).Where("user_id = ? AND revoked_at IS NULL", userID).Update("revoked_at", now).Error; err != nil {
+			return err
+		}
+		return audit.NewService(tx).Record(ctx, event)
+	})
 }

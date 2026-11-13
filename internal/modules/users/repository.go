@@ -132,10 +132,6 @@ func (r *Repository) OtherActiveSuperadmins(ctx context.Context, id string) (int
 	return count, err
 }
 
-func (r *Repository) Update(ctx context.Context, user *User) error {
-	return r.db.WithContext(ctx).Save(user).Error
-}
-
 func (r *Repository) RevokeSessions(ctx context.Context, userID string) error {
 	return r.db.WithContext(ctx).Table("auth_sessions").Where("user_id = ? AND revoked_at IS NULL", userID).
 		Update("revoked_at", gorm.Expr("CURRENT_TIMESTAMP(6)")).Error

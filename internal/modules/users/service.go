@@ -28,6 +28,9 @@ func (s *Service) Create(ctx context.Context, actor authz.Principal, request Cre
 	if err := actor.RequireRole(string(RoleSuperadmin), string(RolePrincipal), string(RoleAdmin)); err != nil {
 		return Response{}, err
 	}
+	if len(request.TemporaryPassword) > 72 {
+		return Response{}, apperror.New(http.StatusUnprocessableEntity, "PASSWORD_TOO_LONG", "Password sementara maksimal 72 byte")
+	}
 	if request.Role == RolePrincipal && actor.Role != string(RoleSuperadmin) {
 		return Response{}, apperror.New(http.StatusForbidden, "ROLE_ASSIGNMENT_DENIED", "Hanya superadmin dapat membuat akun kepala sekolah")
 	}
@@ -124,6 +127,9 @@ func (s *Service) ResetCredential(ctx context.Context, actor authz.Principal, id
 	}
 	if err := canManageTarget(actor, user); err != nil {
 		return err
+	}
+	if len(request.TemporaryPassword) > 72 {
+		return apperror.New(http.StatusUnprocessableEntity, "PASSWORD_TOO_LONG", "Password sementara maksimal 72 byte")
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(request.TemporaryPassword), bcrypt.DefaultCost)
 	if err != nil {

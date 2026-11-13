@@ -4,12 +4,12 @@ import "lms-cn-api/internal/modules/users"
 
 type LoginRequest struct {
 	Identifier string `json:"identifier" binding:"required,min=3,max=64"`
-	Password   string `json:"password" binding:"required,min=8,max=128"`
+	Password   string `json:"password" binding:"required,min=8,max=72"`
 }
 
 type ChangePasswordRequest struct {
-	CurrentPassword string `json:"current_password" binding:"required,min=8,max=128"`
-	NewPassword     string `json:"new_password" binding:"required,min=8,max=128"`
+	CurrentPassword string `json:"current_password" binding:"required,min=8,max=72"`
+	NewPassword     string `json:"new_password" binding:"required,min=8,max=72"`
 }
 
 type SessionResponse struct {

@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -63,7 +64,7 @@ func (s *Service) Login(ctx context.Context, request LoginRequest) (SessionRespo
 	if err != nil {
 		return SessionResponse{}, "", err
 	}
-	_ = s.audit.Record(ctx, audit.Record{ActorID: user.ID, Action: "auth.login", EntityType: "auth_session", EntityID: session.ID})
+	s.recordAudit(ctx, audit.Record{ActorID: user.ID, Action: "auth.login", EntityType: "auth_session", EntityID: session.ID})
 	return response, rawRefresh, nil
 }
 
@@ -88,7 +89,7 @@ func (s *Service) Logout(ctx context.Context, principal authz.Principal) error {
 	if err := s.repository.Revoke(ctx, principal.SessionID, s.now().UTC()); err != nil {
 		return apperror.Wrap(http.StatusInternalServerError, "LOGOUT_FAILED", "Gagal mengakhiri sesi", err)
 	}
-	_ = s.audit.Record(ctx, audit.Record{ActorID: principal.UserID, Action: "auth.logout", EntityType: "auth_session", EntityID: principal.SessionID})
+	s.recordAudit(ctx, audit.Record{ActorID: principal.UserID, Action: "auth.logout", EntityType: "auth_session", EntityID: principal.SessionID})
 	return nil
 }
 
@@ -108,20 +109,28 @@ func (s *Service) ChangePassword(ctx context.Context, principal authz.Principal,
 	if request.CurrentPassword == request.NewPassword {
 		return apperror.New(http.StatusUnprocessableEntity, "PASSWORD_UNCHANGED", "Password baru harus berbeda")
 	}
+	if len(request.NewPassword) > 72 {
+		return apperror.New(http.StatusUnprocessableEntity, "PASSWORD_TOO_LONG", "Password baru maksimal 72 byte")
+	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(request.NewPassword), bcrypt.DefaultCost)
 	if err != nil {
 		return apperror.Wrap(http.StatusInternalServerError, "PASSWORD_HASH_FAILED", "Gagal memperbarui password", err)
 	}
-	user.PasswordHash = string(hash)
-	user.MustChangePassword = false
-	if err := s.users.Update(ctx, &user); err != nil {
+	if err := s.repository.ChangePassword(ctx, user.ID, user.PasswordHash, string(hash), s.now().UTC(), audit.Record{
+		ActorID: user.ID, Action: "auth.password_changed", EntityType: "user", EntityID: user.ID,
+	}); err != nil {
+		if errors.Is(err, ErrPasswordChanged) {
+			return apperror.New(http.StatusConflict, "PASSWORD_CHANGED", "Password akun baru saja berubah. Silakan login kembali")
+		}
 		return apperror.Wrap(http.StatusInternalServerError, "PASSWORD_UPDATE_FAILED", "Gagal memperbarui password", err)
 	}
-	if err := s.repository.RevokeAllForUser(ctx, user.ID, s.now().UTC()); err != nil {
-		return apperror.Wrap(http.StatusInternalServerError, "SESSION_REVOKE_FAILED", "Password berubah tetapi sesi gagal diakhiri", err)
-	}
-	_ = s.audit.Record(ctx, audit.Record{ActorID: user.ID, Action: "auth.password_changed", EntityType: "user", EntityID: user.ID})
 	return nil
+}
+
+func (s *Service) recordAudit(ctx context.Context, event audit.Record) {
+	if err := s.audit.Record(ctx, event); err != nil {
+		slog.ErrorContext(ctx, "authentication audit write failed", "action", event.Action, "error", err)
+	}
 }
 
 func (s *Service) VerifyAccessToken(rawToken string) (authz.Principal, error) {
