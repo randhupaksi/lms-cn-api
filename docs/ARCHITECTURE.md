@@ -1,5 +1,8 @@
 # Citra Negara LMS API Architecture
 
+See the [API documentation index](INDEX.md) for the security, operations,
+governance, and analytics contract documents.
+
 Citra Negara LMS API uses a pragmatic modular monolith. It keeps deployment
 simple while giving each implemented business domain a clear ownership
 boundary.
@@ -31,9 +34,12 @@ pkg is reusable and domain-agnostic
 
 Implemented modules are `auth`, `users`, `academics`, `questions`, `exams`,
 `attempts`, `grading`, `results`, `audit`, `monitoring`, `materials`,
-`assignments`, `analytics`, and `governance`. Cross-module access uses explicit service
-boundaries for course ownership and enrollment checks. Query composition stays
-inside each repository; services coordinate authorization and business rules.
+`assignments`, `analytics`, and `governance`. Cross-module access uses explicit
+service boundaries for course ownership and enrollment checks. Query
+composition stays inside each repository; services coordinate authorization
+and business rules. School-wide academic coordination for the `curriculum`
+role is implemented through the governance and academic capabilities; it is
+not a separate persistence module or a grant of account/governance privileges.
 
 ## Security and exam integrity
 
@@ -69,7 +75,7 @@ inside each repository; services coordinate authorization and business rules.
   Teaching authoring/grading remains assignment-scoped for both `teacher` and
   `curriculum`; student attempts remain student-only.
 
-See [SCHOOL_GOVERNANCE.md](SCHOOL_GOVERNANCE.md) for contracts and invariants.
+See [School Governance](SCHOOL_GOVERNANCE.md) for contracts and invariants.
 - Versioned migrations are the only production schema path. Backup, restore,
   load-test, and incident procedures are documented in `docs/OPERATIONS.md`.
 
@@ -78,7 +84,7 @@ See [SCHOOL_GOVERNANCE.md](SCHOOL_GOVERNANCE.md) for contracts and invariants.
 Dashboard charts use the additive, read-only analytics insights endpoint.
 Its repository owns school-time aggregation and membership-scoped queries;
 its service shapes the bounded date series and whitelisted response. See
-[DASHBOARD_INSIGHTS.md](DASHBOARD_INSIGHTS.md) for scope and field semantics.
+[Dashboard Insights](DASHBOARD_INSIGHTS.md) for scope and field semantics.
 
 - Use lowercase Go package names and descriptive file names in snake_case.
 - Return the shared response envelope from HTTP handlers.

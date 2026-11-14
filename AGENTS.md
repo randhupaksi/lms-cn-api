@@ -4,12 +4,16 @@
 > are in `../AGENTS.md`; read them first. Architecture detail is in
 > `docs/ARCHITECTURE.md`.
 
+The API documentation map is [`docs/INDEX.md`](docs/INDEX.md); it links the
+canonical security, operations, governance, and analytics contracts.
+
 ## 1. Product and current scope
 
 This is the Go/Gin REST API for Citra Negara LMS. The current implementation is
 a modular monolith with authentication, users, academics, question and exam
 authoring, attempts, grading/results, monitoring/audit, materials, assignments,
-and analytics modules. Preserve their published contracts and consult
+analytics, and school governance modules. It serves six school roles, including
+principal and curriculum coordination. Preserve published contracts and consult
 `../docs/IMPLEMENTATION_STATUS.md` before extending product scope; do not add
 unconfirmed business modules.
 

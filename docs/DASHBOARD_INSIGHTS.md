@@ -1,5 +1,8 @@
 # Dashboard insights contract
 
+See the [API documentation index](INDEX.md) for architecture, security, and
+operations guidance.
+
 `GET /api/v1/analytics/dashboard/insights` uses the existing authenticated,
 password-change-complete analytics route group. It accepts no client role,
 user, course, or date overrides. The existing `/analytics/dashboard` response

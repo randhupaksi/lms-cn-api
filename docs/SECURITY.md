@@ -1,5 +1,8 @@
 # Security Baseline
 
+See the [API documentation index](INDEX.md) for architecture, governance,
+operations, and contract documentation.
+
 ## Implemented controls
 
 - password hashing with bcrypt;
