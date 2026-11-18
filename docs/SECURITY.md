@@ -6,7 +6,9 @@ operations, and contract documentation.
 ## Implemented controls
 
 - password hashing with bcrypt;
-- short-lived JWT access tokens and rotated, hashed refresh tokens;
+- 15-minute JWT access tokens and rotated, hashed refresh tokens with a
+  24-hour absolute session expiry from login; refresh rotation does not extend
+  the server-side expiry;
 - server-side session revocation and disabled-account checks;
 - role and course ownership checks on sensitive endpoints;
 - DTO whitelisting and generic production-safe error responses;
@@ -19,6 +21,14 @@ operations, and contract documentation.
 - forwarded client IP headers are trusted only from explicitly configured
   `TRUSTED_PROXIES` addresses; an empty value disables proxy-header trust;
 - JSON request bodies are limited to 4 MiB and oversized requests receive 413;
+- course material attachments accept verified JPEG, PNG, PDF, and DOCX files;
+  each file is limited to 8 MiB, with at most five files and 20 MiB per
+  material. Images are dimension-checked; documents are served as downloads.
+  Attachment reads require course enrollment for students, assigned-course
+  access for teaching staff, or an explicitly authorized school-admin role;
+- attachment bytes are stored in MySQL, never in a public web directory. The
+  API returns attachment metadata separately from bytes and does not log file
+  content or download URLs;
 - password creation and change reject values beyond bcrypt's 72-byte limit.
 
 ## Required infrastructure controls

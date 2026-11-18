@@ -92,10 +92,12 @@ The governance schema is introduced and extended by these migrations:
 2. `000007_principal_leadership_actions` — principal leadership actions and
    action history.
 3. `000008_curriculum_role` — curriculum role support and related constraints.
+4. `000009_material_attachments` — protected file metadata and content for
+   course material attachments.
 
-The complete current migration range is `000001` through `000008`. Review the
+The complete current migration range is `000001` through `000009`. Review the
 specific down migration and preserve a verified backup before any rollback;
-rollback may remove governance records or role assignments.
+rollback may remove governance records, role assignments, or material files.
 
 The API seeder creates fictional development data and runs only when
 `SEED_DEMO_DATA` is enabled in a development environment. It is disabled in

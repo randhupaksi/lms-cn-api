@@ -43,9 +43,11 @@ not a separate persistence module or a grant of account/governance privileges.
 
 ## Security and exam integrity
 
-- Short-lived JWT access tokens identify a revocable server-side session.
+- 15-minute JWT access tokens identify a revocable server-side session.
 - Refresh tokens are opaque, hashed at rest, rotated, and delivered through an
-  HttpOnly cookie. Disabled users and revoked sessions are rejected server-side.
+  HttpOnly cookie. The server-side session expires 24 hours after login and
+  refresh rotation does not extend that expiry. Disabled users and revoked
+  sessions are rejected server-side.
 - Temporary credentials carry a signed password-change requirement and cannot
   access business endpoints until changed.
 - Exam questions and answer options are snapshotted before publication.
@@ -53,6 +55,9 @@ not a separate persistence module or a grant of account/governance privileges.
 - Deadlines, finalization, objective grading, result visibility, and ownership
   checks are enforced in database-backed API transactions.
 - Student contracts omit correct-answer fields.
+- `materials` owns draft-only file attachments. Validated attachment metadata
+  and bytes are persisted together in MySQL; protected downloads reuse the
+  course-enrollment and teaching-assignment boundaries.
 
 ## Operations and observability
 

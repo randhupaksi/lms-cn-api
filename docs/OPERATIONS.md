@@ -10,14 +10,20 @@ infrastructure-specific procedures.
 1. Use a dedicated MySQL database and restricted application account.
 2. The API applies pending versioned migrations in filename order and records
    each applied version in `schema_migrations`. The current source range is
-   `000001`–`000008`. Review the deployment log and resulting schema before
+   `000001`–`000009`. Review the deployment log and resulting schema before
    continuing.
 3. Create a verified database backup before applying a schema change.
 4. Configure production secrets outside the repository.
-5. Set `COOKIE_SECURE=true`, an explicit `ALLOWED_ORIGINS`, and a strong
-   `JWT_SECRET` of at least 32 random characters.
+5. Set `COOKIE_SECURE=true`, an explicit `ALLOWED_ORIGINS`, a strong
+   `JWT_SECRET` of at least 32 random characters, `ACCESS_TOKEN_TTL=15m`, and
+   `REFRESH_TOKEN_TTL=24h` for a 24-hour absolute login session.
 6. Run the API and web checks documented in their repository READMEs.
 7. Verify `/api/v1/health/live` and `/api/v1/health` after deployment.
+
+Course material attachment bytes are stored in MySQL and are included in the
+database backup. Uploads are capped at 8 MiB per file and 20 MiB per material;
+plan backup capacity and retention for this additional database content. Deploy
+the API migration before the web version that offers attachment uploads.
 
 Production startup fails fast when secure cookies are disabled, the example JWT
 secret is configured, an allowed origin is not an HTTPS non-local origin, the
