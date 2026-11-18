@@ -19,6 +19,7 @@ const (
 	maxMaterialAttachments     = 5
 	maxMaterialAttachmentTotal = 20 << 20
 	maxImagePixels             = int64(25_000_000)
+	maxAttachmentNameRunes     = 180
 )
 
 func validateAttachment(fileName string, data []byte) (string, string, error) {
@@ -76,8 +77,13 @@ func sanitizeAttachmentName(original string) (string, error) {
 	}
 
 	characters := []rune(name)
-	if len(characters) > 180 {
-		name = string(characters[:180])
+	if len(characters) > maxAttachmentNameRunes {
+		extension := path.Ext(name)
+		stemLimit := maxAttachmentNameRunes - len([]rune(extension))
+		if stemLimit < 1 {
+			return "", invalidAttachmentType()
+		}
+		name = string(characters[:stemLimit]) + extension
 	}
 	return name, nil
 }

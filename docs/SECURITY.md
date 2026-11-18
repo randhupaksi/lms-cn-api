@@ -15,7 +15,9 @@ operations, and contract documentation.
 - question snapshots and student payloads without answer keys;
 - idempotent attempt start, answer save, and final submission;
 - rate limiting for public authentication endpoints;
-- structured request logging without request bodies or tokens;
+- structured request logging and handler panic recovery using route templates
+  and request IDs, without dumping headers, cookies, request bodies, or panic
+  values;
 - read-only administrative audit access;
 - explicit CORS and environment-driven secrets;
 - forwarded client IP headers are trusted only from explicitly configured
@@ -46,7 +48,9 @@ operations, and contract documentation.
 
 - Never log passwords, tokens, question keys, student answers, or full export
   contents.
-- Treat exported results as confidential files.
+- Treat exported results as confidential files. Result exports ask clients and
+  intermediaries to avoid storing the HTTP response. CSV exporters keep user
+  text beginning with spreadsheet formula markers in text form.
 - Re-run authorization and exam-integrity tests after route or schema changes.
 - Review any attempt reset or score-change feature before implementation; both
   require explicit audit events and product policy.

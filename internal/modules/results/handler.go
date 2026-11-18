@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"lms-cn-api/internal/middleware"
+	"lms-cn-api/pkg/csvexport"
 	"lms-cn-api/pkg/pagination"
 	"lms-cn-api/pkg/request"
 	"lms-cn-api/pkg/response"
@@ -44,7 +45,7 @@ func (h *Handler) exportByExam(c *gin.Context) {
 		if item.PublishedAt != nil {
 			publishedAt = item.PublishedAt.UTC().Format("2006-01-02T15:04:05Z")
 		}
-		_ = writer.Write([]string{item.StudentName, item.Identifier, item.ExamTitle, strconv.FormatFloat(item.Score, 'f', 2, 64), strconv.FormatFloat(item.MaxScore, 'f', 2, 64), strconv.FormatFloat(item.Percentage, 'f', 2, 64), item.Status, item.GradedAt.UTC().Format("2006-01-02T15:04:05Z"), publishedAt})
+		_ = writer.Write([]string{csvexport.Text(item.StudentName), csvexport.Text(item.Identifier), csvexport.Text(item.ExamTitle), strconv.FormatFloat(item.Score, 'f', 2, 64), strconv.FormatFloat(item.MaxScore, 'f', 2, 64), strconv.FormatFloat(item.Percentage, 'f', 2, 64), item.Status, item.GradedAt.UTC().Format("2006-01-02T15:04:05Z"), publishedAt})
 	}
 	writer.Flush()
 	if err := writer.Error(); err != nil {
@@ -52,6 +53,7 @@ func (h *Handler) exportByExam(c *gin.Context) {
 		return
 	}
 	c.Header("Content-Disposition", `attachment; filename="hasil-ujian.csv"`)
+	c.Header("Cache-Control", "private, no-store")
 	c.Data(http.StatusOK, "text/csv; charset=utf-8", append([]byte{0xEF, 0xBB, 0xBF}, buffer.Bytes()...))
 }
 

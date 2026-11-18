@@ -39,6 +39,11 @@ func (h *Handler) uploadAttachment(c *gin.Context) {
 		response.FromError(c, apperror.New(http.StatusForbidden, "MATERIAL_WRITE_DENIED", "Hanya guru yang ditugaskan dapat mengelola materi"))
 		return
 	}
+	materialID, err := request.RequireID(c, "materialID")
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
 	maxRequestBytes := int64(maxMaterialAttachmentBytes + (1 << 20))
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxRequestBytes)
 	fileHeader, err := c.FormFile("file")
@@ -68,11 +73,6 @@ func (h *Handler) uploadAttachment(c *gin.Context) {
 	}
 	if len(data) > maxMaterialAttachmentBytes {
 		response.FromError(c, apperror.New(http.StatusRequestEntityTooLarge, "ATTACHMENT_SIZE_INVALID", "Ukuran lampiran maksimal 8 MiB"))
-		return
-	}
-	materialID, err := request.RequireID(c, "materialID")
-	if err != nil {
-		response.FromError(c, err)
 		return
 	}
 	attachment, err := h.service.UploadAttachment(c.Request.Context(), principal, materialID, fileHeader.Filename, data)

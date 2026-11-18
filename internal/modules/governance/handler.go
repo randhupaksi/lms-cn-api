@@ -7,12 +7,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"lms-cn-api/internal/middleware"
 	"lms-cn-api/pkg/apperror"
+	"lms-cn-api/pkg/csvexport"
 	"lms-cn-api/pkg/pagination"
 	"lms-cn-api/pkg/request"
 	"lms-cn-api/pkg/response"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -266,13 +266,6 @@ func (h *Handler) reports(c *gin.Context) {
 	}
 	response.SuccessWithMeta(c, 200, "Laporan berhasil dimuat", v, p.Meta(n))
 }
-func safeCSV(value string) string {
-	trimmed := strings.TrimLeft(value, " \t\r\n")
-	if trimmed != "" && strings.ContainsRune("=+-@", rune(trimmed[0])) {
-		return "'" + value
-	}
-	return value
-}
 func (h *Handler) export(c *gin.Context) {
 	a, _ := middleware.Principal(c)
 	rows, total, err := h.service.Reports(c.Request.Context(), a, c.Query("year_id"), c.Query("class_id"), 1, 10000)
@@ -292,7 +285,7 @@ func (h *Handler) export(c *gin.Context) {
 		if row.AverageScore != nil {
 			avg = fmt.Sprintf("%.2f", *row.AverageScore)
 		}
-		_ = w.Write([]string{safeCSV(row.YearName), safeCSV(row.ClassName), safeCSV(row.Name), strconv.FormatInt(row.Students, 10), strconv.FormatInt(row.Teachers, 10), strconv.FormatInt(row.Exams, 10), strconv.FormatInt(row.SubmittedAttempts, 10), strconv.FormatInt(row.PublishedResults, 10), avg, strconv.FormatInt(row.BelowReference, 10), fmt.Sprintf("%.2f", row.PassingReference), strconv.FormatInt(row.Assignments, 10), strconv.FormatInt(row.PendingGrading, 10)})
+		_ = w.Write([]string{csvexport.Text(row.YearName), csvexport.Text(row.ClassName), csvexport.Text(row.Name), strconv.FormatInt(row.Students, 10), strconv.FormatInt(row.Teachers, 10), strconv.FormatInt(row.Exams, 10), strconv.FormatInt(row.SubmittedAttempts, 10), strconv.FormatInt(row.PublishedResults, 10), avg, strconv.FormatInt(row.BelowReference, 10), fmt.Sprintf("%.2f", row.PassingReference), strconv.FormatInt(row.Assignments, 10), strconv.FormatInt(row.PendingGrading, 10)})
 	}
 	w.Flush()
 	if err = w.Error(); err != nil {

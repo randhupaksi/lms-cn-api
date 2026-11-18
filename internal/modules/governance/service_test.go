@@ -1,6 +1,8 @@
 package governance
 
 import (
+	"lms-cn-api/pkg/csvexport"
+
 	"context"
 	"github.com/gin-gonic/gin"
 	"lms-cn-api/internal/authz"
@@ -107,11 +109,11 @@ func TestGovernanceHTTPRoleBoundary(t *testing.T) {
 }
 func TestCSVFormulaEscaping(t *testing.T) {
 	for _, value := range []string{"=1+1", " +SUM(A1)", "\t@formula", "-2", "+3"} {
-		if !strings.HasPrefix(safeCSV(value), "'") {
+		if !strings.HasPrefix(csvexport.Text(value), "'") {
 			t.Fatal("unsafe CSV cell")
 		}
 	}
-	if safeCSV("Kelas XII") != "Kelas XII" {
+	if csvexport.Text("Kelas XII") != "Kelas XII" {
 		t.Fatal("plain label modified")
 	}
 }
