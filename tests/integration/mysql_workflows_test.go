@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"image"
 	"image/png"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -33,6 +34,7 @@ import (
 	"lms-cn-api/internal/modules/results"
 	"lms-cn-api/internal/modules/users"
 	"lms-cn-api/internal/router"
+	"lms-cn-api/pkg/apperror"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -58,6 +60,25 @@ func TestMySQLSchoolWorkflows(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	migrations := filepath.Join("..", "..", "migrations")
+	var baselineYearID string
+	if !db.Migrator().HasTable("schema_migrations") {
+		priorMigrations, err := copyPriorMigrations(t, migrations)
+		if err != nil {
+			t.Fatalf("prepare prior migration set: %v", err)
+		}
+		if err := database.RunMigrations(ctx, db, priorMigrations); err != nil {
+			t.Fatalf("apply schema through migration 000008: %v", err)
+		}
+		baselineYearID = uuid.NewString()
+		baselineYear := academics.AcademicYear{
+			ID: baselineYearID, Name: "Prior schema fixture", Status: "active",
+			StartsOn: time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC),
+			EndsOn:   time.Date(2027, time.January, 1, 0, 0, 0, 0, time.UTC),
+		}
+		if err := db.WithContext(ctx).Create(&baselineYear).Error; err != nil {
+			t.Fatalf("create record on prior schema: %v", err)
+		}
+	}
 	migrated := make(chan error, 2)
 	begin := make(chan struct{})
 	for range 2 {
@@ -75,6 +96,15 @@ func TestMySQLSchoolWorkflows(t *testing.T) {
 	if t.Failed() {
 		return
 	}
+	if baselineYearID != "" {
+		if !db.Migrator().HasTable(&materials.Attachment{}) {
+			t.Fatal("migration 000009 did not create the material attachment table")
+		}
+		var preserved academics.AcademicYear
+		if err := db.WithContext(ctx).First(&preserved, "id = ?", baselineYearID).Error; err != nil {
+			t.Fatalf("migration 000009 did not preserve existing academic data: %v", err)
+		}
+	}
 	if err := database.RunMigrations(ctx, db, migrations); err != nil {
 		t.Fatalf("repeat migrations: %v", err)
 	}
@@ -86,7 +116,11 @@ func TestMySQLSchoolWorkflows(t *testing.T) {
 	if err != nil {
 		t.Fatal("cannot hash disposable student password")
 	}
-	teacher := users.User{ID: uuid.NewString(), Identifier: "teacher." + unique, FullName: "Synthetic Teacher", Role: users.RoleTeacher, Status: users.StatusActive, PasswordHash: "fixture-cannot-log-in"}
+	teacher := users.User{ID: uuid.NewString(), Identifier: "teacher." + unique, FullName: "Synthetic Teacher", Role: users.RoleTeacher, Status: users.StatusActive, PasswordHash: string(studentHash)}
+	curriculum := users.User{ID: uuid.NewString(), Identifier: "curriculum." + unique, FullName: "Synthetic Curriculum Coordinator", Role: users.RoleCurriculum, Status: users.StatusActive, PasswordHash: string(studentHash)}
+	admin := users.User{ID: uuid.NewString(), Identifier: "admin." + unique, FullName: "Synthetic Admin", Role: users.RoleAdmin, Status: users.StatusActive, PasswordHash: string(studentHash)}
+	principal := users.User{ID: uuid.NewString(), Identifier: "principal." + unique, FullName: "Synthetic Principal", Role: users.RolePrincipal, Status: users.StatusActive, PasswordHash: string(studentHash)}
+	superadmin := users.User{ID: uuid.NewString(), Identifier: "superadmin." + unique, FullName: "Synthetic Superadmin", Role: users.RoleSuperadmin, Status: users.StatusActive, PasswordHash: string(studentHash)}
 	student := users.User{ID: uuid.NewString(), Identifier: "student." + unique, FullName: "Synthetic Student", Role: users.RoleStudent, Status: users.StatusActive, PasswordHash: string(studentHash)}
 	outsider := users.User{ID: uuid.NewString(), Identifier: "outsider." + unique, FullName: "Synthetic Unenrolled Student", Role: users.RoleStudent, Status: users.StatusActive, PasswordHash: "fixture-cannot-log-in"}
 	year := academics.AcademicYear{ID: uuid.NewString(), Name: "Year " + unique, Status: "active", StartsOn: now.AddDate(0, -1, 0), EndsOn: now.AddDate(0, 1, 0)}
@@ -99,14 +133,21 @@ func TestMySQLSchoolWorkflows(t *testing.T) {
 			t.Fatalf("create synthetic %T: %v", model, err)
 		}
 	}
-	for _, model := range []any{&teacher, &student, &outsider, &year, &class, &subject, &course} {
+	for _, model := range []any{&teacher, &curriculum, &admin, &principal, &superadmin, &student, &outsider, &year, &class, &subject, &course} {
 		create(model)
 	}
 	create(&academics.CourseTeacher{CourseID: course.ID, TeacherID: teacher.ID, AssignedAt: now})
+	create(&academics.CourseTeacher{CourseID: course.ID, TeacherID: curriculum.ID, AssignedAt: now})
 	create(&academics.CourseStudent{CourseID: course.ID, StudentID: student.ID, EnrolledAt: now})
 	studentActor := authz.Principal{UserID: student.ID, Role: string(student.Role)}
 	teacherActor := authz.Principal{UserID: teacher.ID, Role: string(teacher.Role)}
+	curriculumActor := authz.Principal{UserID: curriculum.ID, Role: string(curriculum.Role)}
 	outsiderActor := authz.Principal{UserID: outsider.ID, Role: string(outsider.Role)}
+	unassignedTeacherActor := authz.Principal{UserID: uuid.NewString(), Role: string(users.RoleTeacher)}
+	unassignedCurriculumActor := authz.Principal{UserID: uuid.NewString(), Role: string(users.RoleCurriculum)}
+	adminActor := authz.Principal{UserID: admin.ID, Role: string(admin.Role)}
+	principalActor := authz.Principal{UserID: principal.ID, Role: string(principal.Role)}
+	superadminActor := authz.Principal{UserID: superadmin.ID, Role: string(superadmin.Role)}
 	auditService := audit.NewService(db)
 	courseAccess := academics.NewService(academics.NewRepository(db), auditService)
 	t.Run("authenticated HTTP", func(t *testing.T) {
@@ -120,6 +161,14 @@ func TestMySQLSchoolWorkflows(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyRoleRouteMatrix(t, ctx, engine, studentPassword, []roleAccount{
+			{identifier: superadmin.Identifier, role: string(superadmin.Role)},
+			{identifier: principal.Identifier, role: string(principal.Role)},
+			{identifier: curriculum.Identifier, role: string(curriculum.Role)},
+			{identifier: admin.Identifier, role: string(admin.Role)},
+			{identifier: teacher.Identifier, role: string(teacher.Role)},
+			{identifier: student.Identifier, role: string(student.Role)},
+		})
 		verifyAuthenticatedHTTP(t, ctx, engine, student.Identifier, studentPassword)
 	})
 	t.Run("materials", func(t *testing.T) {
@@ -142,6 +191,9 @@ func TestMySQLSchoolWorkflows(t *testing.T) {
 	}
 	examID := createExam("Synthetic concurrency exam")
 	secondExamID := createExam("Synthetic key conflict exam")
+	t.Run("role and course ownership matrix", func(t *testing.T) {
+		verifyRoleAndCourseOwnershipMatrix(t, ctx, courseAccess, course.ID, examID, teacherActor, curriculumActor, studentActor, outsiderActor, unassignedTeacherActor, unassignedCurriculumActor, adminActor, principalActor, superadminActor, auditService, db)
+	})
 	source := questions.Question{ID: uuid.NewString(), CourseID: course.ID, AuthorID: teacher.ID, Type: questions.TypeSingleChoice, Stem: "Synthetic question", DefaultPoints: 1, Status: "active", Version: 1}
 	create(&source)
 	sourceOption := questions.Option{ID: uuid.NewString(), QuestionID: source.ID, Content: "Synthetic option", IsCorrect: true, Position: 1}
@@ -236,6 +288,134 @@ func TestMySQLSchoolWorkflows(t *testing.T) {
 	}
 	if _, err := resultService.FindStudent(ctx, outsiderActor, resultRow.ID); err == nil {
 		t.Fatal("a published result should be private to its student")
+	}
+}
+
+func copyPriorMigrations(t *testing.T, source string) (string, error) {
+	t.Helper()
+	entries, err := os.ReadDir(source)
+	if err != nil {
+		return "", err
+	}
+	directory := t.TempDir()
+	for _, entry := range entries {
+		name := entry.Name()
+		version, _, hasVersion := strings.Cut(name, "_")
+		if entry.IsDir() || !hasVersion || !strings.HasSuffix(name, ".up.sql") || version >= "000009" {
+			continue
+		}
+		content, err := os.ReadFile(filepath.Join(source, name))
+		if err != nil {
+			return "", err
+		}
+		if err := os.WriteFile(filepath.Join(directory, name), content, 0o600); err != nil {
+			return "", err
+		}
+	}
+	return directory, nil
+}
+
+func verifyRoleAndCourseOwnershipMatrix(
+	t *testing.T,
+	ctx context.Context,
+	courseAccess *academics.Service,
+	courseID string,
+	examID string,
+	teacher, curriculum, student, outsider, unassignedTeacher, unassignedCurriculum, admin, principal, superadmin authz.Principal,
+	auditRecorder audit.Recorder,
+	db *gorm.DB,
+) {
+	t.Helper()
+	managerCases := []struct {
+		name    string
+		actor   authz.Principal
+		allowed bool
+	}{
+		{name: "superadmin", actor: superadmin, allowed: true},
+		{name: "principal", actor: principal, allowed: true},
+		{name: "admin", actor: admin, allowed: true},
+		{name: "assigned teacher", actor: teacher, allowed: true},
+		{name: "assigned curriculum", actor: curriculum, allowed: true},
+		{name: "enrolled student", actor: student},
+		{name: "unenrolled student", actor: outsider},
+		{name: "unassigned teacher", actor: unassignedTeacher},
+		{name: "unassigned curriculum", actor: unassignedCurriculum},
+	}
+	for _, testCase := range managerCases {
+		t.Run("course manager/"+testCase.name, func(t *testing.T) {
+			err := courseAccess.RequireCourseManager(ctx, testCase.actor, courseID)
+			if (err == nil) != testCase.allowed {
+				t.Fatalf("manager access allowed=%v, error=%v", testCase.allowed, err)
+			}
+		})
+	}
+	if err := courseAccess.RequireCourseManager(ctx, teacher, uuid.NewString()); err == nil {
+		t.Fatal("a teacher assigned to another course received manager access")
+	}
+	if err := courseAccess.RequireCourseManager(ctx, curriculum, uuid.NewString()); err == nil {
+		t.Fatal("a curriculum coordinator assigned to another course received manager access")
+	}
+	studentCases := []struct {
+		name    string
+		actor   authz.Principal
+		allowed bool
+	}{
+		{name: "superadmin", actor: superadmin},
+		{name: "principal", actor: principal},
+		{name: "admin", actor: admin},
+		{name: "assigned teacher", actor: teacher},
+		{name: "assigned curriculum", actor: curriculum},
+		{name: "enrolled student", actor: student, allowed: true},
+		{name: "unenrolled student", actor: outsider},
+		{name: "unassigned teacher", actor: unassignedTeacher},
+		{name: "unassigned curriculum", actor: unassignedCurriculum},
+	}
+	for _, testCase := range studentCases {
+		t.Run("course student/"+testCase.name, func(t *testing.T) {
+			err := courseAccess.RequireCourseStudent(ctx, testCase.actor, courseID)
+			if (err == nil) != testCase.allowed {
+				t.Fatalf("student access allowed=%v, error=%v", testCase.allowed, err)
+			}
+		})
+	}
+
+	questionService := questions.NewService(questions.NewRepository(db), courseAccess, auditRecorder)
+	examService := exams.NewService(exams.NewRepository(db), courseAccess, auditRecorder)
+	materialService := materials.NewService(materials.NewRepository(db), courseAccess, auditRecorder)
+	assignmentService := assignments.NewService(assignments.NewRepository(db), courseAccess, auditRecorder)
+	resultService := results.NewService(results.NewRepository(db), courseAccess, auditRecorder)
+	deniedActors := []struct {
+		name  string
+		actor authz.Principal
+	}{
+		{name: "enrolled student", actor: student},
+		{name: "unenrolled student", actor: outsider},
+		{name: "admin", actor: admin},
+		{name: "principal", actor: principal},
+		{name: "superadmin", actor: superadmin},
+		{name: "unassigned teacher", actor: unassignedTeacher},
+		{name: "unassigned curriculum", actor: unassignedCurriculum},
+	}
+	for _, testCase := range deniedActors {
+		t.Run("authoring denied/"+testCase.name, func(t *testing.T) {
+			assertForbidden := func(operation string, err error) {
+				t.Helper()
+				appErr, ok := apperror.As(err)
+				if !ok || appErr.Status != http.StatusForbidden {
+					t.Fatalf("%s should be forbidden, got %v", operation, err)
+				}
+			}
+			_, err := questionService.Create(ctx, testCase.actor, questions.WriteRequest{CourseID: courseID})
+			assertForbidden("question authoring", err)
+			_, err = examService.Create(ctx, testCase.actor, exams.WriteRequest{CourseID: courseID})
+			assertForbidden("exam authoring", err)
+			_, err = materialService.Create(ctx, testCase.actor, materials.WriteRequest{CourseID: courseID})
+			assertForbidden("material authoring", err)
+			_, err = assignmentService.Create(ctx, testCase.actor, assignments.WriteRequest{CourseID: courseID, DueAt: time.Now().UTC().Add(time.Hour)})
+			assertForbidden("assignment authoring", err)
+			_, err = resultService.PublishByExam(ctx, testCase.actor, examID)
+			assertForbidden("result publication", err)
+		})
 	}
 }
 
