@@ -25,6 +25,14 @@ database backup. Uploads are capped at 8 MiB per file and 20 MiB per material;
 plan backup capacity and retention for this additional database content. Deploy
 the API migration before the web version that offers attachment uploads.
 
+Migration runners on the same database server hold a lock scoped to the
+database while applying pending files. A replica that cannot acquire the lock
+within 30 seconds fails startup; retry it once the migration runner has
+finished. MySQL and MariaDB can commit DDL implicitly. If a file fails
+partway through, inspect the applied statements and version record before
+retrying. Rehearse recovery on an isolated copy before modifying the target
+schema.
+
 Production startup fails fast when secure cookies are disabled, the example JWT
 secret is configured, an allowed origin is not an HTTPS non-local origin, the
 refresh-token lifetime is not longer than the access-token lifetime, or the

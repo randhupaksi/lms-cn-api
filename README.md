@@ -50,8 +50,13 @@ go build ./cmd/api
 ```
 
 Database integration checks are opt-in and require the isolated test setup
-described in the relevant API documents. Backup, restore, deployment, and
-pre-exam procedures are in [Operations](docs/OPERATIONS.md).
+described in the relevant API documents. For the school workflow suite, set
+`LMS_INTEGRATION_TEST_DSN` to a MySQL driver DSN for a disposable database on
+`127.0.0.1` with a name ending in `_test`, include `parseTime=true`, and run
+`go test -v -count=1 ./tests/integration`. This suite applies forward
+migrations and inserts synthetic rows. CI provisions a fresh database for
+each run. Backup, restore, deployment, and pre-exam procedures are in
+[Operations](docs/OPERATIONS.md).
 
 ## Repository boundaries
 

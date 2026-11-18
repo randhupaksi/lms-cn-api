@@ -56,9 +56,6 @@ func (s *Service) Start(ctx context.Context, actor authz.Principal, examID, idem
 	if err != nil {
 		return StartResponse{}, mapAttemptError(err)
 	}
-	if hydrated, hydratedExam, hydrateErr := s.repository.FindForStudent(ctx, attempt.ID, actor.UserID); hydrateErr == nil {
-		attempt, exam = hydrated, hydratedExam
-	}
 	if attempt.Status != StatusInProgress {
 		return StartResponse{}, apperror.New(http.StatusConflict, "ATTEMPT_FINAL", "Attempt sudah selesai")
 	}

@@ -2,17 +2,21 @@ package database
 
 import (
 	"context"
+	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"gorm.io/gorm"
 )
 
 const migrationTable = "schema_migrations"
+const migrationLockName = "CONCAT('lms:', LEFT(SHA2(DATABASE(), 256), 60))"
 
 // RunMigrations applies pending versioned SQL migrations in filename order.
 // Each version is recorded only after all statements in that file succeed.
@@ -35,12 +39,47 @@ func RunMigrations(ctx context.Context, db *gorm.DB, directory string) error {
 		}
 	}
 	sort.Strings(files)
+	return db.WithContext(ctx).Connection(func(conn *gorm.DB) (result error) {
+		// MySQL DDL can commit implicitly, so a transaction or row lock
+		// cannot serialize the complete migration across application replicas.
+		acquireCtx, cancel := context.WithTimeout(ctx, 35*time.Second)
+		defer cancel()
+		var acquired sql.NullInt64
+		err := conn.WithContext(acquireCtx).Raw("SELECT GET_LOCK(" + migrationLockName + ", 30)").Row().Scan(&acquired)
+		if err != nil {
+			discardMigrationConnection(conn)
+			return fmt.Errorf("acquire migration lock: %w", err)
+		}
+		if !acquired.Valid || acquired.Int64 != 1 {
+			return errors.New("could not acquire migration lock")
+		}
+		defer func() {
+			releaseCtx, cancelRelease := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancelRelease()
+			var released sql.NullInt64
+			err := conn.WithContext(releaseCtx).Raw("SELECT RELEASE_LOCK(" + migrationLockName + ")").Row().Scan(&released)
+			if err != nil || !released.Valid || released.Int64 != 1 {
+				discardMigrationConnection(conn)
+				result = errors.Join(result, errors.New("could not release migration lock"))
+			}
+		}()
+		return applyMigrations(conn.Session(&gorm.Session{NewDB: true}), directory, files)
+	})
+}
+
+func discardMigrationConnection(db *gorm.DB) {
+	if conn, ok := db.Statement.ConnPool.(*sql.Conn); ok {
+		_ = conn.Raw(func(any) error { return driver.ErrBadConn })
+	}
+}
+
+func applyMigrations(db *gorm.DB, directory string, files []string) error {
 	var serverVersion string
-	if err := db.WithContext(ctx).Raw("SELECT VERSION()").Scan(&serverVersion).Error; err != nil {
+	if err := db.Raw("SELECT VERSION()").Scan(&serverVersion).Error; err != nil {
 		return fmt.Errorf("read database engine: %w", err)
 	}
 
-	if err := db.WithContext(ctx).Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
+	if err := db.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
 		version VARCHAR(255) NOT NULL PRIMARY KEY,
 		applied_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`).Error; err != nil {
@@ -49,7 +88,7 @@ func RunMigrations(ctx context.Context, db *gorm.DB, directory string) error {
 
 	for _, filename := range files {
 		var applied int64
-		if err := db.WithContext(ctx).Table(migrationTable).Where("version = ?", filename).Count(&applied).Error; err != nil {
+		if err := db.Table(migrationTable).Where("version = ?", filename).Count(&applied).Error; err != nil {
 			return fmt.Errorf("check migration %s: %w", filename, err)
 		}
 		if applied > 0 {
@@ -66,7 +105,7 @@ func RunMigrations(ctx context.Context, db *gorm.DB, directory string) error {
 			return fmt.Errorf("migration %s contains no SQL statements", filename)
 		}
 
-		if err := db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := db.Transaction(func(tx *gorm.DB) error {
 			for index, statement := range statements {
 				statement = migrationForEngine(statement, serverVersion)
 				if err := tx.Exec(statement).Error; err != nil {

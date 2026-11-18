@@ -69,20 +69,7 @@ func (r *Repository) Start(ctx context.Context, examID, studentID, idempotencyKe
 		if eligible == 0 {
 			return ErrNotEligible
 		}
-		var keyed Attempt
-		err := tx.Where("student_id = ? AND start_idempotency_key = ?", studentID, idempotencyKey).First(&keyed).Error
-		if err == nil {
-			if keyed.ExamID != examID {
-				return ErrIdempotencyConflict
-			}
-			result = keyed
-			return nil
-		}
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return err
-		}
-		var existing Attempt
-		err = tx.Where("exam_id = ? AND student_id = ?", examID, studentID).First(&existing).Error
+		existing, err := findStartedAttempt(tx, examID, studentID, idempotencyKey)
 		if err == nil {
 			result = existing
 			return nil
@@ -96,15 +83,40 @@ func (r *Repository) Start(ctx context.Context, examID, studentID, idempotencyKe
 		}
 		result = Attempt{ID: uuid.NewString(), ExamID: examID, StudentID: studentID, Status: StatusInProgress, StartIdempotencyKey: idempotencyKey, StartedAt: now, DeadlineAt: deadline}
 		if err := tx.Create(&result).Error; err != nil {
+			if errors.Is(err, gorm.ErrDuplicatedKey) {
+				return errConcurrentStart
+			}
 			return err
 		}
 		return tx.Create(&Event{ID: uuid.NewString(), AttemptID: result.ID, ActorID: studentID, EventType: "attempt.started", Metadata: []byte("{}")}).Error
 	})
+	if errors.Is(err, errConcurrentStart) {
+		// Read outside the rolled-back transaction so MySQL's repeatable-read
+		// snapshot cannot hide the concurrent request that committed first.
+		result, err = findStartedAttempt(r.db.WithContext(ctx), examID, studentID, idempotencyKey)
+	}
 	if err != nil {
 		return Attempt{}, exams.Exam{}, err
 	}
-	hydratedExam, err := r.loadExam(ctx, examID)
-	return result, hydratedExam, err
+	return r.FindForStudent(ctx, result.ID, studentID)
+}
+
+var errConcurrentStart = errors.New("concurrent attempt start")
+
+func findStartedAttempt(db *gorm.DB, examID, studentID, key string) (Attempt, error) {
+	var attempt Attempt
+	err := db.Where("student_id = ? AND start_idempotency_key = ?", studentID, key).First(&attempt).Error
+	if err == nil {
+		if attempt.ExamID != examID {
+			return Attempt{}, ErrIdempotencyConflict
+		}
+		return attempt, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return Attempt{}, err
+	}
+	err = db.Where("exam_id = ? AND student_id = ?", examID, studentID).First(&attempt).Error
+	return attempt, err
 }
 
 func (r *Repository) FindForStudent(ctx context.Context, attemptID, studentID string) (Attempt, exams.Exam, error) {

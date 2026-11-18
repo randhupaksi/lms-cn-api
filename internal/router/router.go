@@ -41,7 +41,7 @@ func New(cfg *config.Config, db *gorm.DB) (*Engine, error) {
 	if err := engine.SetTrustedProxies(cfg.TrustedProxies); err != nil {
 		return nil, fmt.Errorf("configure trusted proxy addresses: %w", err)
 	}
-	engine.Use(gin.Recovery(), middleware.RequestID(), middleware.RequestLogger(), middleware.SecurityHeaders(cfg.AppEnv == "production"), middleware.CORS(cfg.AllowedOrigins), gzip.Gzip(gzip.DefaultCompression))
+	engine.Use(middleware.RequestID(), middleware.RequestLogger(), middleware.SecurityHeaders(cfg.AppEnv == "production"), middleware.CORS(cfg.AllowedOrigins), gzip.Gzip(gzip.DefaultCompression), middleware.Recover())
 
 	auditService := audit.NewService(db)
 	usersRepository := users.NewRepository(db)
