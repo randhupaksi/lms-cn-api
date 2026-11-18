@@ -13,8 +13,10 @@ import (
 )
 
 var (
-	ErrNotFound = errors.New("material not found")
-	ErrLocked   = errors.New("material locked")
+	ErrNotFound           = errors.New("material not found")
+	ErrLocked             = errors.New("material locked")
+	ErrAttachmentNotFound = errors.New("material attachment not found")
+	ErrAttachmentLimit    = errors.New("material attachment limit reached")
 )
 
 type Repository struct{ db *gorm.DB }
@@ -34,6 +36,95 @@ func (r *Repository) Find(ctx context.Context, id string) (Material, error) {
 		return Material{}, err
 	}
 	return material, nil
+}
+
+func (r *Repository) ListAttachments(ctx context.Context, materialIDs []string) ([]Attachment, error) {
+	attachments := make([]Attachment, 0)
+	if len(materialIDs) == 0 {
+		return attachments, nil
+	}
+	err := r.db.WithContext(ctx).
+		Select("id", "material_id", "file_name", "content_type", "size_bytes", "checksum_sha256", "created_at").
+		Where("material_id IN ?", materialIDs).
+		Order("created_at ASC, id ASC").
+		Find(&attachments).Error
+	return attachments, err
+}
+
+func (r *Repository) FindAttachment(ctx context.Context, materialID, attachmentID string) (Attachment, error) {
+	var attachment Attachment
+	err := r.db.WithContext(ctx).Where("material_id = ? AND id = ?", materialID, attachmentID).First(&attachment).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return Attachment{}, ErrAttachmentNotFound
+	}
+	return attachment, err
+}
+
+func (r *Repository) CreateAttachment(ctx context.Context, attachment *Attachment) (Attachment, error) {
+	var saved Attachment
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var material Material
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&material, "id = ?", attachment.MaterialID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrNotFound
+			}
+			return err
+		}
+		if material.Status != StatusDraft {
+			return ErrLocked
+		}
+
+		err := tx.Select("id", "material_id", "file_name", "content_type", "size_bytes", "checksum_sha256", "created_at").
+			Where("material_id = ? AND checksum_sha256 = ?", attachment.MaterialID, attachment.ChecksumSHA256).
+			First(&saved).Error
+		if err == nil {
+			return nil
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+
+		var count int64
+		if err := tx.Model(&Attachment{}).Where("material_id = ?", attachment.MaterialID).Count(&count).Error; err != nil {
+			return err
+		}
+		var totalBytes uint64
+		if err := tx.Model(&Attachment{}).Where("material_id = ?", attachment.MaterialID).Select("COALESCE(SUM(size_bytes), 0)").Scan(&totalBytes).Error; err != nil {
+			return err
+		}
+		if count >= maxMaterialAttachments || totalBytes+attachment.SizeBytes > maxMaterialAttachmentTotal {
+			return ErrAttachmentLimit
+		}
+		if err := tx.Create(attachment).Error; err != nil {
+			return err
+		}
+		saved = *attachment
+		return nil
+	})
+	return saved, err
+}
+
+func (r *Repository) DeleteAttachment(ctx context.Context, materialID, attachmentID string) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var material Material
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&material, "id = ?", materialID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrNotFound
+			}
+			return err
+		}
+		if material.Status != StatusDraft {
+			return ErrLocked
+		}
+		result := tx.Where("material_id = ? AND id = ?", materialID, attachmentID).Delete(&Attachment{})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return ErrAttachmentNotFound
+		}
+		return nil
+	})
 }
 
 func (r *Repository) List(ctx context.Context, courseID, studentID string, publishedOnly bool) ([]materialRow, error) {

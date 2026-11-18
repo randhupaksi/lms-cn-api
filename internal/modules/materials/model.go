@@ -24,6 +24,19 @@ type Material struct {
 
 func (Material) TableName() string { return "course_materials" }
 
+type Attachment struct {
+	ID             string    `gorm:"type:char(36);primaryKey"`
+	MaterialID     string    `gorm:"type:char(36);not null;index:idx_material_attachments_material,priority:1;uniqueIndex:uq_material_attachments_checksum,priority:1"`
+	FileName       string    `gorm:"size:255;not null"`
+	ContentType    string    `gorm:"size:100;not null"`
+	SizeBytes      uint64    `gorm:"not null"`
+	ChecksumSHA256 string    `gorm:"column:checksum_sha256;size:64;not null;uniqueIndex:uq_material_attachments_checksum,priority:2"`
+	FileData       []byte    `gorm:"column:file_data;type:longblob;not null"`
+	CreatedAt      time.Time `gorm:"index:idx_material_attachments_material,priority:2"`
+}
+
+func (Attachment) TableName() string { return "course_material_attachments" }
+
 type Progress struct {
 	MaterialID  string `gorm:"type:char(36);primaryKey"`
 	StudentID   string `gorm:"type:char(36);primaryKey"`

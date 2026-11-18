@@ -2,6 +2,8 @@ package materials
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"net/http"
 	"strings"
@@ -43,6 +45,9 @@ func (s *Service) List(ctx context.Context, actor authz.Principal, courseID stri
 	if err != nil {
 		return nil, apperror.Wrap(http.StatusInternalServerError, "MATERIALS_READ_FAILED", "Gagal memuat materi", err)
 	}
+	if err := s.includeAttachments(ctx, rows); err != nil {
+		return nil, apperror.Wrap(http.StatusInternalServerError, "MATERIALS_READ_FAILED", "Gagal memuat materi", err)
+	}
 	result := make([]Response, len(rows))
 	for index, row := range rows {
 		result[index] = toResponse(row)
@@ -73,11 +78,33 @@ func (s *Service) ListPaged(ctx context.Context, actor authz.Principal, courseID
 	if err != nil {
 		return nil, 0, apperror.Wrap(http.StatusInternalServerError, "MATERIALS_READ_FAILED", "Gagal memuat materi", err)
 	}
+	if err := s.includeAttachments(ctx, rows); err != nil {
+		return nil, 0, apperror.Wrap(http.StatusInternalServerError, "MATERIALS_READ_FAILED", "Gagal memuat materi", err)
+	}
 	result := make([]Response, len(rows))
 	for index, row := range rows {
 		result[index] = toResponse(row)
 	}
 	return result, total, nil
+}
+
+func (s *Service) includeAttachments(ctx context.Context, rows []materialRow) error {
+	materialIDs := make([]string, 0, len(rows))
+	for _, row := range rows {
+		materialIDs = append(materialIDs, row.ID)
+	}
+	attachments, err := s.repository.ListAttachments(ctx, materialIDs)
+	if err != nil {
+		return err
+	}
+	byMaterial := make(map[string][]Attachment, len(rows))
+	for _, attachment := range attachments {
+		byMaterial[attachment.MaterialID] = append(byMaterial[attachment.MaterialID], attachment)
+	}
+	for index := range rows {
+		rows[index].Attachments = byMaterial[rows[index].ID]
+	}
+	return nil
 }
 
 func (s *Service) Create(ctx context.Context, actor authz.Principal, request WriteRequest) (Response, error) {
@@ -110,7 +137,11 @@ func (s *Service) Update(ctx context.Context, actor authz.Principal, id string, 
 		return Response{}, mapError(err)
 	}
 	_ = s.audit.Record(ctx, audit.Record{ActorID: actor.UserID, Action: "material.updated", EntityType: "material", EntityID: id})
-	return toResponse(materialRow{Material: updated}), nil
+	rows := []materialRow{{Material: updated}}
+	if err := s.includeAttachments(ctx, rows); err != nil {
+		return Response{}, apperror.Wrap(http.StatusInternalServerError, "MATERIALS_READ_FAILED", "Gagal memuat materi", err)
+	}
+	return toResponse(rows[0]), nil
 }
 
 func (s *Service) Publish(ctx context.Context, actor authz.Principal, id string) error {
@@ -145,6 +176,72 @@ func (s *Service) Complete(ctx context.Context, actor authz.Principal, id string
 	return nil
 }
 
+func (s *Service) UploadAttachment(ctx context.Context, actor authz.Principal, materialID, fileName string, data []byte) (AttachmentInfo, error) {
+	if _, err := s.requireTeacherOwner(ctx, actor, materialID, ""); err != nil {
+		return AttachmentInfo{}, err
+	}
+	name, contentType, err := validateAttachment(fileName, data)
+	if err != nil {
+		return AttachmentInfo{}, err
+	}
+	checksum := sha256.Sum256(data)
+	attachment := Attachment{
+		ID:             uuid.NewString(),
+		MaterialID:     materialID,
+		FileName:       name,
+		ContentType:    contentType,
+		SizeBytes:      uint64(len(data)),
+		ChecksumSHA256: hex.EncodeToString(checksum[:]),
+		FileData:       data,
+		CreatedAt:      s.now().UTC(),
+	}
+	saved, err := s.repository.CreateAttachment(ctx, &attachment)
+	if err != nil {
+		return AttachmentInfo{}, mapError(err)
+	}
+	_ = s.audit.Record(ctx, audit.Record{ActorID: actor.UserID, Action: "material.attachment.uploaded", EntityType: "material", EntityID: materialID})
+	return toAttachmentInfo(saved), nil
+}
+
+func (s *Service) DeleteAttachment(ctx context.Context, actor authz.Principal, materialID, attachmentID string) error {
+	if _, err := s.requireTeacherOwner(ctx, actor, materialID, ""); err != nil {
+		return err
+	}
+	if err := s.repository.DeleteAttachment(ctx, materialID, attachmentID); err != nil {
+		return mapError(err)
+	}
+	_ = s.audit.Record(ctx, audit.Record{ActorID: actor.UserID, Action: "material.attachment.deleted", EntityType: "material", EntityID: materialID})
+	return nil
+}
+
+func (s *Service) GetAttachment(ctx context.Context, actor authz.Principal, materialID, attachmentID string) (Attachment, error) {
+	material, err := s.repository.Find(ctx, materialID)
+	if err != nil {
+		return Attachment{}, mapError(err)
+	}
+	switch {
+	case actor.Role == string(users.RoleStudent):
+		if material.Status != StatusPublished {
+			return Attachment{}, apperror.New(http.StatusNotFound, "MATERIAL_NOT_FOUND", "Materi tidak ditemukan")
+		}
+		if err := s.academics.RequireCourseStudent(ctx, actor, material.CourseID); err != nil {
+			return Attachment{}, err
+		}
+	case actor.IsTeachingStaff():
+		if err := s.academics.RequireCourseManager(ctx, actor, material.CourseID); err != nil {
+			return Attachment{}, err
+		}
+	case actor.IsSchoolAdmin():
+	default:
+		return Attachment{}, apperror.New(http.StatusForbidden, "MATERIAL_ATTACHMENT_READ_DENIED", "Kamu tidak memiliki izin untuk membuka lampiran ini")
+	}
+	attachment, err := s.repository.FindAttachment(ctx, materialID, attachmentID)
+	if err != nil {
+		return Attachment{}, mapError(err)
+	}
+	return attachment, nil
+}
+
 func (s *Service) requireTeacherOwner(ctx context.Context, actor authz.Principal, id, requestedCourseID string) (Material, error) {
 	if !actor.IsTeachingStaff() {
 		return Material{}, apperror.New(http.StatusForbidden, "MATERIAL_WRITE_DENIED", "Hanya guru yang ditugaskan dapat mengelola materi")
@@ -168,6 +265,12 @@ func mapError(err error) error {
 	}
 	if errors.Is(err, ErrLocked) {
 		return apperror.New(http.StatusConflict, "MATERIAL_LOCKED", "Materi yang telah dipublikasikan tidak dapat diubah")
+	}
+	if errors.Is(err, ErrAttachmentNotFound) {
+		return apperror.New(http.StatusNotFound, "MATERIAL_ATTACHMENT_NOT_FOUND", "Lampiran materi tidak ditemukan")
+	}
+	if errors.Is(err, ErrAttachmentLimit) {
+		return apperror.New(http.StatusConflict, "MATERIAL_ATTACHMENT_LIMIT", "Lampiran materi maksimal 5 file dengan total ukuran 20 MiB")
 	}
 	return apperror.Wrap(http.StatusInternalServerError, "MATERIAL_WRITE_FAILED", "Gagal memproses materi", err)
 }
