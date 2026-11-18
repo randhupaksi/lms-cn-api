@@ -118,7 +118,7 @@ func (s *Service) Create(ctx context.Context, actor authz.Principal, request Wri
 	if err := s.repository.Create(ctx, &material); err != nil {
 		return Response{}, apperror.Wrap(http.StatusInternalServerError, "MATERIAL_CREATE_FAILED", "Gagal membuat materi", err)
 	}
-	_ = s.audit.Record(ctx, audit.Record{ActorID: actor.UserID, Action: "material.created", EntityType: "material", EntityID: material.ID})
+	audit.RecordBestEffort(ctx, s.audit, audit.Record{ActorID: actor.UserID, Action: "material.created", EntityType: "material", EntityID: material.ID})
 	return toResponse(materialRow{Material: material}), nil
 }
 
@@ -136,7 +136,7 @@ func (s *Service) Update(ctx context.Context, actor authz.Principal, id string, 
 	if err != nil {
 		return Response{}, mapError(err)
 	}
-	_ = s.audit.Record(ctx, audit.Record{ActorID: actor.UserID, Action: "material.updated", EntityType: "material", EntityID: id})
+	audit.RecordBestEffort(ctx, s.audit, audit.Record{ActorID: actor.UserID, Action: "material.updated", EntityType: "material", EntityID: id})
 	rows := []materialRow{{Material: updated}}
 	if err := s.includeAttachments(ctx, rows); err != nil {
 		return Response{}, apperror.Wrap(http.StatusInternalServerError, "MATERIALS_READ_FAILED", "Gagal memuat materi", err)
@@ -152,7 +152,7 @@ func (s *Service) Publish(ctx context.Context, actor authz.Principal, id string)
 	if err := s.repository.Publish(ctx, material.ID, s.now().UTC()); err != nil {
 		return mapError(err)
 	}
-	_ = s.audit.Record(ctx, audit.Record{ActorID: actor.UserID, Action: "material.published", EntityType: "material", EntityID: id})
+	audit.RecordBestEffort(ctx, s.audit, audit.Record{ActorID: actor.UserID, Action: "material.published", EntityType: "material", EntityID: id})
 	return nil
 }
 
@@ -199,7 +199,7 @@ func (s *Service) UploadAttachment(ctx context.Context, actor authz.Principal, m
 	if err != nil {
 		return AttachmentInfo{}, mapError(err)
 	}
-	_ = s.audit.Record(ctx, audit.Record{ActorID: actor.UserID, Action: "material.attachment.uploaded", EntityType: "material", EntityID: materialID})
+	audit.RecordBestEffort(ctx, s.audit, audit.Record{ActorID: actor.UserID, Action: "material.attachment.uploaded", EntityType: "material", EntityID: materialID})
 	return toAttachmentInfo(saved), nil
 }
 
@@ -210,7 +210,7 @@ func (s *Service) DeleteAttachment(ctx context.Context, actor authz.Principal, m
 	if err := s.repository.DeleteAttachment(ctx, materialID, attachmentID); err != nil {
 		return mapError(err)
 	}
-	_ = s.audit.Record(ctx, audit.Record{ActorID: actor.UserID, Action: "material.attachment.deleted", EntityType: "material", EntityID: materialID})
+	audit.RecordBestEffort(ctx, s.audit, audit.Record{ActorID: actor.UserID, Action: "material.attachment.deleted", EntityType: "material", EntityID: materialID})
 	return nil
 }
 

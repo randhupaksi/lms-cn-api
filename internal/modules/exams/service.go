@@ -49,7 +49,7 @@ func (s *Service) Create(ctx context.Context, actor authz.Principal, request Wri
 	if err := s.repository.Create(ctx, &exam); err != nil {
 		return Response{}, apperror.Wrap(http.StatusInternalServerError, "EXAM_CREATE_FAILED", "Gagal membuat ujian", err)
 	}
-	_ = s.audit.Record(ctx, audit.Record{ActorID: actor.UserID, Action: "exam.created", EntityType: "exam", EntityID: exam.ID})
+	audit.RecordBestEffort(ctx, s.audit, audit.Record{ActorID: actor.UserID, Action: "exam.created", EntityType: "exam", EntityID: exam.ID})
 	return toResponse(exam, 0, false), nil
 }
 
@@ -127,7 +127,7 @@ func (s *Service) Update(ctx context.Context, actor authz.Principal, id string, 
 	if err != nil {
 		return Response{}, mapExamError(err)
 	}
-	_ = s.audit.Record(ctx, audit.Record{ActorID: actor.UserID, Action: "exam.updated", EntityType: "exam", EntityID: id})
+	audit.RecordBestEffort(ctx, s.audit, audit.Record{ActorID: actor.UserID, Action: "exam.updated", EntityType: "exam", EntityID: id})
 	return toResponse(updated, participantCount, false), nil
 }
 
@@ -139,7 +139,7 @@ func (s *Service) SetQuestions(ctx context.Context, actor authz.Principal, id st
 	if err := s.repository.ReplaceQuestions(ctx, exam, request.Questions); err != nil {
 		return mapExamError(err)
 	}
-	_ = s.audit.Record(ctx, audit.Record{ActorID: actor.UserID, Action: "exam.questions_replaced", EntityType: "exam", EntityID: id, Metadata: map[string]any{"count": len(request.Questions)}})
+	audit.RecordBestEffort(ctx, s.audit, audit.Record{ActorID: actor.UserID, Action: "exam.questions_replaced", EntityType: "exam", EntityID: id, Metadata: map[string]any{"count": len(request.Questions)}})
 	return nil
 }
 
@@ -151,7 +151,7 @@ func (s *Service) SetParticipants(ctx context.Context, actor authz.Principal, id
 	if err := s.repository.ReplaceParticipants(ctx, exam, request.StudentIDs); err != nil {
 		return mapExamError(err)
 	}
-	_ = s.audit.Record(ctx, audit.Record{ActorID: actor.UserID, Action: "exam.participants_replaced", EntityType: "exam", EntityID: id, Metadata: map[string]any{"count": len(request.StudentIDs)}})
+	audit.RecordBestEffort(ctx, s.audit, audit.Record{ActorID: actor.UserID, Action: "exam.participants_replaced", EntityType: "exam", EntityID: id, Metadata: map[string]any{"count": len(request.StudentIDs)}})
 	return nil
 }
 
@@ -166,7 +166,7 @@ func (s *Service) Publish(ctx context.Context, actor authz.Principal, id string)
 	if err := s.repository.Publish(ctx, id, s.now().UTC()); err != nil {
 		return mapExamError(err)
 	}
-	_ = s.audit.Record(ctx, audit.Record{ActorID: actor.UserID, Action: "exam.published", EntityType: "exam", EntityID: id})
+	audit.RecordBestEffort(ctx, s.audit, audit.Record{ActorID: actor.UserID, Action: "exam.published", EntityType: "exam", EntityID: id})
 	return nil
 }
 
@@ -184,7 +184,7 @@ func (s *Service) Unpublish(ctx context.Context, actor authz.Principal, id strin
 	if err := s.repository.Unpublish(ctx, id); err != nil {
 		return mapExamError(err)
 	}
-	_ = s.audit.Record(ctx, audit.Record{ActorID: actor.UserID, Action: "exam.unpublished", EntityType: "exam", EntityID: id})
+	audit.RecordBestEffort(ctx, s.audit, audit.Record{ActorID: actor.UserID, Action: "exam.unpublished", EntityType: "exam", EntityID: id})
 	return nil
 }
 

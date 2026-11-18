@@ -19,6 +19,11 @@ operations, and contract documentation.
   and request IDs, without dumping headers, cookies, request bodies, or panic
   values;
 - read-only administrative audit access;
+- best-effort audit writes for domain operations report persistence failures at
+  error level with the action and entity type only; keep centralized error-log
+  alerting enabled and do not log the underlying database error. Critical
+  account and governance mutations write their audit event in the same
+  transaction as the change;
 - explicit CORS and environment-driven secrets;
 - forwarded client IP headers are trusted only from explicitly configured
   `TRUSTED_PROXIES` addresses; an empty value disables proxy-header trust;

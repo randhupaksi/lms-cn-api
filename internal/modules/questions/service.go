@@ -46,7 +46,7 @@ func (s *Service) Create(ctx context.Context, actor authz.Principal, request Wri
 	if err := s.repository.Create(ctx, &question); err != nil {
 		return Response{}, apperror.Wrap(http.StatusInternalServerError, "QUESTION_CREATE_FAILED", "Gagal membuat soal", err)
 	}
-	_ = s.audit.Record(ctx, audit.Record{ActorID: actor.UserID, Action: "question.created", EntityType: "question", EntityID: question.ID})
+	audit.RecordBestEffort(ctx, s.audit, audit.Record{ActorID: actor.UserID, Action: "question.created", EntityType: "question", EntityID: question.ID})
 	return toResponse(question), nil
 }
 
@@ -106,7 +106,7 @@ func (s *Service) Update(ctx context.Context, actor authz.Principal, id string, 
 	if err != nil {
 		return Response{}, mapQuestionError(err)
 	}
-	_ = s.audit.Record(ctx, audit.Record{ActorID: actor.UserID, Action: "question.updated", EntityType: "question", EntityID: id, Metadata: map[string]any{"version": updated.Version}})
+	audit.RecordBestEffort(ctx, s.audit, audit.Record{ActorID: actor.UserID, Action: "question.updated", EntityType: "question", EntityID: id, Metadata: map[string]any{"version": updated.Version}})
 	return toResponse(updated), nil
 }
 
@@ -124,7 +124,7 @@ func (s *Service) Archive(ctx context.Context, actor authz.Principal, id string)
 	if err := s.repository.Archive(ctx, id); err != nil {
 		return mapQuestionError(err)
 	}
-	_ = s.audit.Record(ctx, audit.Record{ActorID: actor.UserID, Action: "question.archived", EntityType: "question", EntityID: id})
+	audit.RecordBestEffort(ctx, s.audit, audit.Record{ActorID: actor.UserID, Action: "question.archived", EntityType: "question", EntityID: id})
 	return nil
 }
 

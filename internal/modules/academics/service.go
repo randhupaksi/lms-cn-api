@@ -39,7 +39,7 @@ func (s *Service) CreateAcademicYear(ctx context.Context, actor authz.Principal,
 	if err := s.repository.CreateAcademicYear(ctx, &value); err != nil {
 		return AcademicYearResponse{}, mapWriteError(err, "Tahun ajaran sudah tersedia")
 	}
-	_ = s.audit.Record(ctx, audit.Record{ActorID: actor.UserID, Action: "academic_year.created", EntityType: "academic_year", EntityID: value.ID})
+	audit.RecordBestEffort(ctx, s.audit, audit.Record{ActorID: actor.UserID, Action: "academic_year.created", EntityType: "academic_year", EntityID: value.ID})
 	return toAcademicYearResponse(value), nil
 }
 
@@ -66,7 +66,7 @@ func (s *Service) CreateClassGroup(ctx context.Context, actor authz.Principal, r
 	if err := s.repository.CreateClassGroup(ctx, &value); err != nil {
 		return ClassGroupResponse{}, mapWriteError(err, "Kelas sudah tersedia pada tahun ajaran ini")
 	}
-	_ = s.audit.Record(ctx, audit.Record{ActorID: actor.UserID, Action: "class_group.created", EntityType: "class_group", EntityID: value.ID})
+	audit.RecordBestEffort(ctx, s.audit, audit.Record{ActorID: actor.UserID, Action: "class_group.created", EntityType: "class_group", EntityID: value.ID})
 	return toClassGroupResponse(value), nil
 }
 
@@ -93,7 +93,7 @@ func (s *Service) CreateSubject(ctx context.Context, actor authz.Principal, requ
 	if err := s.repository.CreateSubject(ctx, &value); err != nil {
 		return SubjectResponse{}, mapWriteError(err, "Mata pelajaran dengan kode atau nama tersebut sudah tersedia")
 	}
-	_ = s.audit.Record(ctx, audit.Record{ActorID: actor.UserID, Action: "subject.created", EntityType: "subject", EntityID: value.ID})
+	audit.RecordBestEffort(ctx, s.audit, audit.Record{ActorID: actor.UserID, Action: "subject.created", EntityType: "subject", EntityID: value.ID})
 	return toSubjectResponse(value), nil
 }
 
@@ -124,7 +124,7 @@ func (s *Service) CreateCourse(ctx context.Context, actor authz.Principal, reque
 	if err != nil {
 		return CourseResponse{}, internalReadError(err)
 	}
-	_ = s.audit.Record(ctx, audit.Record{ActorID: actor.UserID, Action: "course.created", EntityType: "course", EntityID: value.ID})
+	audit.RecordBestEffort(ctx, s.audit, audit.Record{ActorID: actor.UserID, Action: "course.created", EntityType: "course", EntityID: value.ID})
 	return toCourseResponse(created), nil
 }
 
@@ -147,7 +147,7 @@ func (s *Service) AssignTeachers(ctx context.Context, actor authz.Principal, cou
 	if err := s.repository.ReplaceTeachers(ctx, courseID, userIDs); err != nil {
 		return mapAssignmentError(err)
 	}
-	_ = s.audit.Record(ctx, audit.Record{ActorID: actor.UserID, Action: "course.teachers_assigned", EntityType: "course", EntityID: courseID, Metadata: map[string]any{"count": len(userIDs)}})
+	audit.RecordBestEffort(ctx, s.audit, audit.Record{ActorID: actor.UserID, Action: "course.teachers_assigned", EntityType: "course", EntityID: courseID, Metadata: map[string]any{"count": len(userIDs)}})
 	return nil
 }
 
@@ -158,7 +158,7 @@ func (s *Service) AssignStudents(ctx context.Context, actor authz.Principal, cou
 	if err := s.repository.ReplaceStudents(ctx, courseID, userIDs); err != nil {
 		return mapAssignmentError(err)
 	}
-	_ = s.audit.Record(ctx, audit.Record{ActorID: actor.UserID, Action: "course.students_assigned", EntityType: "course", EntityID: courseID, Metadata: map[string]any{"count": len(userIDs)}})
+	audit.RecordBestEffort(ctx, s.audit, audit.Record{ActorID: actor.UserID, Action: "course.students_assigned", EntityType: "course", EntityID: courseID, Metadata: map[string]any{"count": len(userIDs)}})
 	return nil
 }
 

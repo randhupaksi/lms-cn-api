@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -128,9 +127,7 @@ func (s *Service) ChangePassword(ctx context.Context, principal authz.Principal,
 }
 
 func (s *Service) recordAudit(ctx context.Context, event audit.Record) {
-	if err := s.audit.Record(ctx, event); err != nil {
-		slog.ErrorContext(ctx, "authentication audit write failed", "action", event.Action, "error", err)
-	}
+	audit.RecordBestEffort(ctx, s.audit, event)
 }
 
 func (s *Service) VerifyAccessToken(rawToken string) (authz.Principal, error) {

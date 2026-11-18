@@ -111,7 +111,7 @@ func (s *Service) PublishByExam(ctx context.Context, actor authz.Principal, exam
 	if err != nil {
 		return 0, mapResultError(err)
 	}
-	_ = s.audit.Record(ctx, audit.Record{ActorID: actor.UserID, Action: "results.published", EntityType: "exam", EntityID: examID, Metadata: map[string]any{"count": count}})
+	audit.RecordBestEffort(ctx, s.audit, audit.Record{ActorID: actor.UserID, Action: "results.published", EntityType: "exam", EntityID: examID, Metadata: map[string]any{"count": count}})
 	return count, nil
 }
 

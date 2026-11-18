@@ -3,6 +3,7 @@ package audit
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 type Event struct {
@@ -39,6 +41,20 @@ type Recorder interface {
 	Record(ctx context.Context, record Record) error
 }
 
+// RecordBestEffort keeps non-transactional domain mutations successful while
+// making audit persistence failures visible to structured server logging.
+// Do not log the underlying error: database driver errors may contain SQL or
+// bound values from sensitive school records.
+func RecordBestEffort(ctx context.Context, recorder Recorder, record Record) {
+	if recorder == nil {
+		slog.ErrorContext(ctx, "audit recorder unavailable", "action", record.Action, "entity_type", record.EntityType)
+		return
+	}
+	if err := recorder.Record(ctx, record); err != nil {
+		slog.ErrorContext(ctx, "audit record failed", "action", record.Action, "entity_type", record.EntityType)
+	}
+}
+
 type Service struct{ db *gorm.DB }
 
 func NewService(db *gorm.DB) *Service { return &Service{db: db} }
@@ -63,7 +79,9 @@ func (s *Service) Record(ctx context.Context, record Record) error {
 		EntityID:   entityID,
 		Metadata:   metadata,
 	}
-	return s.db.WithContext(ctx).Create(&event).Error
+	// Callers own failure reporting. The default SQL logger may include driver
+	// error text even when SQL parameters are redacted.
+	return s.db.WithContext(ctx).Session(&gorm.Session{Logger: logger.Default.LogMode(logger.Silent)}).Create(&event).Error
 }
 
 func (s *Service) List(ctx context.Context, actor authz.Principal, page pagination.Request, filter Filter) ([]Response, int64, error) {

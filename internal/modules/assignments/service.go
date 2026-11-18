@@ -93,7 +93,7 @@ func (s *Service) Create(ctx context.Context, actor authz.Principal, request Wri
 	if err := s.repository.Create(ctx, &assignment); err != nil {
 		return Response{}, apperror.Wrap(http.StatusInternalServerError, "ASSIGNMENT_CREATE_FAILED", "Gagal membuat tugas", err)
 	}
-	_ = s.audit.Record(ctx, audit.Record{ActorID: actor.UserID, Action: "assignment.created", EntityType: "assignment", EntityID: assignment.ID})
+	audit.RecordBestEffort(ctx, s.audit, audit.Record{ActorID: actor.UserID, Action: "assignment.created", EntityType: "assignment", EntityID: assignment.ID})
 	return toResponse(assignmentRow{Assignment: assignment}), nil
 }
 
@@ -110,11 +110,11 @@ func (s *Service) Update(ctx context.Context, actor authz.Principal, id string, 
 		value.Instructions = strings.TrimSpace(request.Instructions)
 		value.DueAt = request.DueAt.UTC()
 		value.MaxScore = request.MaxScore
-	})
+	})	
 	if err != nil {
 		return Response{}, mapError(err)
 	}
-	_ = s.audit.Record(ctx, audit.Record{ActorID: actor.UserID, Action: "assignment.updated", EntityType: "assignment", EntityID: id})
+	audit.RecordBestEffort(ctx, s.audit, audit.Record{ActorID: actor.UserID, Action: "assignment.updated", EntityType: "assignment", EntityID: id})
 	return toResponse(assignmentRow{Assignment: updated}), nil
 }
 
@@ -129,7 +129,7 @@ func (s *Service) Publish(ctx context.Context, actor authz.Principal, id string)
 	if err := s.repository.Publish(ctx, id, s.now().UTC()); err != nil {
 		return mapError(err)
 	}
-	_ = s.audit.Record(ctx, audit.Record{ActorID: actor.UserID, Action: "assignment.published", EntityType: "assignment", EntityID: id})
+	audit.RecordBestEffort(ctx, s.audit, audit.Record{ActorID: actor.UserID, Action: "assignment.published", EntityType: "assignment", EntityID: id})
 	return nil
 }
 
@@ -202,7 +202,7 @@ func (s *Service) Grade(ctx context.Context, actor authz.Principal, submissionID
 	if err := s.repository.Grade(ctx, submissionID, actor.UserID, request.Score, strings.TrimSpace(request.Feedback), s.now().UTC()); err != nil {
 		return mapError(err)
 	}
-	_ = s.audit.Record(ctx, audit.Record{ActorID: actor.UserID, Action: "assignment.graded", EntityType: "assignment_submission", EntityID: submissionID, Metadata: map[string]any{"score": request.Score}})
+	audit.RecordBestEffort(ctx, s.audit, audit.Record{ActorID: actor.UserID, Action: "assignment.graded", EntityType: "assignment_submission", EntityID: submissionID, Metadata: map[string]any{"score": request.Score}})
 	return nil
 }
 
