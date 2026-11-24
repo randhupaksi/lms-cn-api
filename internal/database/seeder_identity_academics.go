@@ -85,6 +85,9 @@ func seedDemoUsers(tx *gorm.DB) (demoDataset, error) {
 		{suffix: 9, identifier: "alya.ramadhani", fullName: "Alya Ramadhani", role: users.RoleStudent},
 		{suffix: 28, identifier: "kepala.sekolah", fullName: "Kepala Sekolah Citra Negara", role: users.RolePrincipal},
 		{suffix: 29, identifier: "kurikulum", fullName: "Guru Kurikulum Citra Negara", role: users.RoleCurriculum},
+		{suffix: 30, identifier: "superadmin", fullName: "Pengelola Sistem Citra Negara", role: users.RoleSuperadmin},
+		{suffix: 31, identifier: "guru", fullName: "Guru Citra Negara", role: users.RoleTeacher},
+		{suffix: 32, identifier: "siswa", fullName: "Siswa Citra Negara", role: users.RoleStudent},
 	} {
 		if _, err = seedDemoUser(tx, definition, string(passwordHash)); err != nil {
 			return demoDataset{}, err

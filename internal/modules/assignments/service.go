@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -110,7 +111,7 @@ func (s *Service) Update(ctx context.Context, actor authz.Principal, id string, 
 		value.Instructions = strings.TrimSpace(request.Instructions)
 		value.DueAt = request.DueAt.UTC()
 		value.MaxScore = request.MaxScore
-	})	
+	})
 	if err != nil {
 		return Response{}, mapError(err)
 	}
@@ -147,10 +148,60 @@ func (s *Service) Submit(ctx context.Context, actor authz.Principal, id string, 
 	if err := s.academics.RequireCourseStudent(ctx, actor, assignment.CourseID); err != nil {
 		return err
 	}
+	request.Content = strings.TrimSpace(request.Content)
+	if request.Content == "" {
+		return apperror.New(http.StatusUnprocessableEntity, "ASSIGNMENT_CONTENT_REQUIRED", "Jawaban tugas tidak boleh kosong")
+	}
+	if err := validateSubmissionAttachmentURL(request.AttachmentURL); err != nil {
+		return err
+	}
 	now := s.now().UTC()
-	submission := Submission{ID: uuid.NewString(), AssignmentID: id, StudentID: actor.UserID, Content: strings.TrimSpace(request.Content), AttachmentURL: strings.TrimSpace(request.AttachmentURL), Status: "submitted", SubmittedAt: now}
+	submission := Submission{ID: uuid.NewString(), AssignmentID: id, StudentID: actor.UserID, Content: request.Content, AttachmentURL: strings.TrimSpace(request.AttachmentURL), Status: "submitted", SubmittedAt: now}
 	if err := s.repository.Submit(ctx, &submission); err != nil {
+		if errors.Is(err, ErrSubmissionConflict) {
+			return apperror.New(http.StatusConflict, "ASSIGNMENT_RESUBMISSION_DENIED", "Pengumpulan hanya dapat diperbaiki setelah dikembalikan guru")
+		}
 		return apperror.Wrap(http.StatusInternalServerError, "ASSIGNMENT_SUBMIT_FAILED", "Gagal mengumpulkan tugas", err)
+	}
+	return nil
+}
+
+func (s *Service) ReturnSubmission(ctx context.Context, actor authz.Principal, submissionID string, request ReturnRequest) error {
+	if !actor.IsTeachingStaff() {
+		return apperror.New(http.StatusForbidden, "ASSIGNMENT_RETURN_DENIED", "Hanya guru yang ditugaskan dapat meminta revisi tugas")
+	}
+	assignment, err := s.repository.SubmissionAssignment(ctx, submissionID)
+	if err != nil {
+		return mapError(err)
+	}
+	if err := s.academics.RequireCourseManager(ctx, actor, assignment.CourseID); err != nil {
+		return err
+	}
+	feedback := strings.TrimSpace(request.Feedback)
+	if feedback == "" {
+		return apperror.New(http.StatusUnprocessableEntity, "ASSIGNMENT_RETURN_FEEDBACK_REQUIRED", "Berikan arahan revisi untuk siswa")
+	}
+	if assignment.Status != StatusPublished || !assignment.DueAt.After(s.now().UTC()) {
+		return apperror.New(http.StatusConflict, "ASSIGNMENT_RETURN_CLOSED", "Tugas tidak terbuka untuk permintaan revisi")
+	}
+	if err := s.repository.ReturnSubmission(ctx, submissionID, feedback, s.now().UTC()); err != nil {
+		if errors.Is(err, ErrSubmissionState) {
+			return apperror.New(http.StatusConflict, "ASSIGNMENT_RETURN_STATE_INVALID", "Hanya pengumpulan yang menunggu penilaian dapat dikembalikan untuk revisi")
+		}
+		return apperror.Wrap(http.StatusInternalServerError, "ASSIGNMENT_RETURN_FAILED", "Gagal mengembalikan tugas untuk revisi", err)
+	}
+	audit.RecordBestEffort(ctx, s.audit, audit.Record{ActorID: actor.UserID, Action: "assignment.returned", EntityType: "assignment_submission", EntityID: submissionID})
+	return nil
+}
+
+func validateSubmissionAttachmentURL(value string) error {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Hostname() == "" || parsed.User != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return apperror.New(http.StatusUnprocessableEntity, "ASSIGNMENT_ATTACHMENT_URL_INVALID", "Tautan lampiran harus menggunakan alamat HTTP atau HTTPS")
 	}
 	return nil
 }
@@ -200,6 +251,9 @@ func (s *Service) Grade(ctx context.Context, actor authz.Principal, submissionID
 		return apperror.New(http.StatusUnprocessableEntity, "ASSIGNMENT_SCORE_INVALID", "Nilai tidak boleh melebihi skor maksimal")
 	}
 	if err := s.repository.Grade(ctx, submissionID, actor.UserID, request.Score, strings.TrimSpace(request.Feedback), s.now().UTC()); err != nil {
+		if errors.Is(err, ErrSubmissionState) {
+			return apperror.New(http.StatusConflict, "ASSIGNMENT_GRADE_STATE_INVALID", "Pengumpulan yang dikembalikan harus menunggu revisi siswa")
+		}
 		return mapError(err)
 	}
 	audit.RecordBestEffort(ctx, s.audit, audit.Record{ActorID: actor.UserID, Action: "assignment.graded", EntityType: "assignment_submission", EntityID: submissionID, Metadata: map[string]any{"score": request.Score}})

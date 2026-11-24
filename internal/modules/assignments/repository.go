@@ -13,8 +13,10 @@ import (
 )
 
 var (
-	ErrNotFound = errors.New("assignment not found")
-	ErrLocked   = errors.New("assignment locked")
+	ErrNotFound           = errors.New("assignment not found")
+	ErrLocked             = errors.New("assignment locked")
+	ErrSubmissionConflict = errors.New("submission cannot be replaced")
+	ErrSubmissionState    = errors.New("submission is not eligible for this action")
 )
 
 type Repository struct{ db *gorm.DB }
@@ -127,7 +129,85 @@ func (r *Repository) Publish(ctx context.Context, id string, now time.Time) erro
 }
 
 func (r *Repository) Submit(ctx context.Context, submission *Submission) error {
-	return r.db.WithContext(ctx).Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "assignment_id"}, {Name: "student_id"}}, DoUpdates: clause.AssignmentColumns([]string{"content", "attachment_url", "status", "score", "feedback", "submitted_at", "graded_at", "graded_by", "updated_at"})}).Create(submission).Error
+	db := r.db.WithContext(ctx)
+	var existing Submission
+	err := db.Where("assignment_id = ? AND student_id = ?", submission.AssignmentID, submission.StudentID).First(&existing).Error
+	if err == nil {
+		if existing.Status != "returned" {
+			if sameSubmissionContent(existing, *submission) {
+				return nil
+			}
+			return ErrSubmissionConflict
+		}
+
+		result := db.Model(&Submission{}).Where("id = ? AND status = ?", existing.ID, "returned").Updates(map[string]any{
+			"content":        submission.Content,
+			"attachment_url": submission.AttachmentURL,
+			"status":         "submitted",
+			"score":          nil,
+			"feedback":       "",
+			"submitted_at":   submission.SubmittedAt,
+			"graded_at":      nil,
+			"graded_by":      nil,
+			"updated_at":     submission.SubmittedAt,
+		})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected > 0 {
+			return nil
+		}
+		return r.acceptMatchingRetry(db, *submission)
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+
+	if err := db.Create(submission).Error; err != nil {
+		if !errors.Is(err, gorm.ErrDuplicatedKey) {
+			return err
+		}
+		return r.acceptMatchingRetry(db, *submission)
+	}
+	return nil
+}
+
+func (r *Repository) acceptMatchingRetry(db *gorm.DB, incoming Submission) error {
+	var current Submission
+	if err := db.Where("assignment_id = ? AND student_id = ?", incoming.AssignmentID, incoming.StudentID).First(&current).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrSubmissionConflict
+		}
+		return err
+	}
+	if sameSubmissionContent(current, incoming) {
+		return nil
+	}
+	return ErrSubmissionConflict
+}
+
+func (r *Repository) ReturnSubmission(ctx context.Context, submissionID, feedback string, now time.Time) error {
+	result := r.db.WithContext(ctx).Model(&Submission{}).
+		Where("id = ? AND status = ?", submissionID, "submitted").
+		Updates(map[string]any{
+			"status":     "returned",
+			"score":      nil,
+			"feedback":   feedback,
+			"graded_at":  nil,
+			"graded_by":  nil,
+			"updated_at": now,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrSubmissionState
+	}
+	return nil
+}
+
+func sameSubmissionContent(existing, incoming Submission) bool {
+	return existing.Content == incoming.Content && existing.AttachmentURL == incoming.AttachmentURL
 }
 
 func (r *Repository) ListSubmissions(ctx context.Context, assignmentID string) ([]submissionRow, error) {
@@ -155,12 +235,12 @@ func (r *Repository) ListSubmissionsPage(ctx context.Context, assignmentID, sear
 }
 
 func (r *Repository) Grade(ctx context.Context, submissionID, graderID string, score float64, feedback string, now time.Time) error {
-	result := r.db.WithContext(ctx).Model(&Submission{}).Where("id = ?", submissionID).Updates(map[string]any{"status": "graded", "score": score, "feedback": feedback, "graded_at": now, "graded_by": graderID})
+	result := r.db.WithContext(ctx).Model(&Submission{}).Where("id = ? AND status IN ?", submissionID, []string{"submitted", "graded"}).Updates(map[string]any{"status": "graded", "score": score, "feedback": feedback, "graded_at": now, "graded_by": graderID})
 	if result.Error != nil {
 		return result.Error
 	}
 	if result.RowsAffected == 0 {
-		return ErrNotFound
+		return ErrSubmissionState
 	}
 	return nil
 }

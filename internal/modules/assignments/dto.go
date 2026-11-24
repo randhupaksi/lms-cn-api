@@ -25,6 +25,10 @@ type GradeRequest struct {
 	Feedback string  `json:"feedback" binding:"max=10000"`
 }
 
+type ReturnRequest struct {
+	Feedback string `json:"feedback" binding:"required,max=10000"`
+}
+
 type Response struct {
 	ID           string              `json:"id"`
 	CourseID     string              `json:"course_id"`

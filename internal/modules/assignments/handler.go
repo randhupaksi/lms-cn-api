@@ -23,6 +23,7 @@ func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
 	group.POST("/:assignmentID/submit", h.submit)
 	group.GET("/:assignmentID/submissions", h.listSubmissions)
 	group.POST("/submissions/:submissionID/grade", h.grade)
+	group.POST("/submissions/:submissionID/return", h.returnSubmission)
 }
 
 func (h *Handler) list(c *gin.Context) {
@@ -112,6 +113,20 @@ func (h *Handler) grade(c *gin.Context) {
 	}
 	principal, _ := middleware.Principal(c)
 	h.respond(c, http.StatusOK, "Nilai tugas berhasil disimpan", nil, h.service.Grade(c.Request.Context(), principal, id, body))
+}
+
+func (h *Handler) returnSubmission(c *gin.Context) {
+	id, ok := h.requireID(c, "submissionID")
+	if !ok {
+		return
+	}
+	var body ReturnRequest
+	if err := request.BindJSON(c, &body); err != nil {
+		response.FromError(c, err)
+		return
+	}
+	principal, _ := middleware.Principal(c)
+	h.respond(c, http.StatusOK, "Tugas dikembalikan untuk revisi", nil, h.service.ReturnSubmission(c.Request.Context(), principal, id, body))
 }
 
 func (h *Handler) requireID(c *gin.Context, name string) (string, bool) {

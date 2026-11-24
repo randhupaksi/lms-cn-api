@@ -475,6 +475,12 @@ func verifyAssignmentFlow(t *testing.T, ctx context.Context, service *assignment
 	if err := service.Submit(ctx, outsider, assignment.ID, submission); err == nil {
 		t.Fatal("assignment should not accept submissions from outside the course")
 	}
+	if err := service.Submit(ctx, student, assignment.ID, assignments.SubmitRequest{Content: "   "}); err == nil {
+		t.Fatal("submission should reject whitespace-only content")
+	}
+	if err := service.Submit(ctx, student, assignment.ID, assignments.SubmitRequest{Content: "Unsafe attachment", AttachmentURL: "javascript:alert(1)"}); err == nil {
+		t.Fatal("submission should reject a non-HTTP attachment URL")
+	}
 	if err := service.Submit(ctx, student, assignment.ID, submission); err != nil {
 		t.Fatal(err)
 	}
@@ -482,11 +488,45 @@ func verifyAssignmentFlow(t *testing.T, ctx context.Context, service *assignment
 	if err != nil || len(submissions) != 1 {
 		t.Fatalf("expected one teacher-visible submission: %v", err)
 	}
-	if err := service.Grade(ctx, teacher, submissions[0].ID, assignments.GradeRequest{Score: 8, Feedback: "Synthetic feedback"}); err != nil {
+	if err := service.ReturnSubmission(ctx, outsider, submissions[0].ID, assignments.ReturnRequest{Feedback: "Revise bagian kesimpulan"}); err == nil {
+		t.Fatal("teacher outside the course should not return a submission")
+	}
+	if err := service.ReturnSubmission(ctx, teacher, submissions[0].ID, assignments.ReturnRequest{Feedback: "   "}); err == nil {
+		t.Fatal("returning a submission should require actionable feedback")
+	}
+	if err := service.ReturnSubmission(ctx, teacher, submissions[0].ID, assignments.ReturnRequest{Feedback: "Revise bagian kesimpulan"}); err != nil {
 		t.Fatal(err)
 	}
 	items, err := service.List(ctx, student, courseID)
-	if err != nil || len(items) != 1 || items[0].Submission == nil || items[0].Submission.Score == nil || *items[0].Submission.Score != 8 {
-		t.Fatalf("expected student-visible graded submission: %v", err)
+	if err != nil || len(items) != 1 || items[0].Submission == nil || items[0].Submission.Status != "returned" || items[0].Submission.Feedback != "Revise bagian kesimpulan" {
+		t.Fatalf("expected student-visible returned submission with feedback: %v", err)
+	}
+	if err := service.Grade(ctx, teacher, submissions[0].ID, assignments.GradeRequest{Score: 8, Feedback: "Premature grade"}); err == nil {
+		t.Fatal("returned submission should wait for the student's revision before grading")
+	}
+	resubmission := assignments.SubmitRequest{Content: "Revised synthetic submission", AttachmentURL: "https://example.test/work.pdf"}
+	if err := service.Submit(ctx, student, assignment.ID, resubmission); err != nil {
+		t.Fatalf("student should be able to resubmit a returned assignment: %v", err)
+	}
+	if err := service.Submit(ctx, student, assignment.ID, resubmission); err != nil {
+		t.Fatalf("same-payload retry should be idempotent: %v", err)
+	}
+	items, err = service.List(ctx, student, courseID)
+	if err != nil || len(items) != 1 || items[0].Submission == nil || items[0].Submission.Status != "submitted" || items[0].Submission.Content != resubmission.Content || items[0].Submission.Feedback != "" || items[0].Submission.Score != nil {
+		t.Fatalf("expected revised submission without stale feedback or score: %v", err)
+	}
+	submissions, err = service.ListSubmissions(ctx, teacher, assignment.ID)
+	if err != nil || len(submissions) != 1 {
+		t.Fatalf("expected one revised teacher-visible submission: %v", err)
+	}
+	if err := service.Grade(ctx, teacher, submissions[0].ID, assignments.GradeRequest{Score: 8, Feedback: "Synthetic feedback"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.Submit(ctx, student, assignment.ID, assignments.SubmitRequest{Content: "Overwritten after grading"}); err == nil {
+		t.Fatal("student should not overwrite a graded submission")
+	}
+	items, err = service.List(ctx, student, courseID)
+	if err != nil || len(items) != 1 || items[0].Submission == nil || items[0].Submission.Score == nil || *items[0].Submission.Score != 8 || items[0].Submission.Content != resubmission.Content {
+		t.Fatalf("expected graded content and score to be preserved: %v", err)
 	}
 }
