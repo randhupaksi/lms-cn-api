@@ -10,7 +10,7 @@ infrastructure-specific procedures.
 1. Use a dedicated MySQL database and restricted application account.
 2. The API applies pending versioned migrations in filename order and records
    each applied version in `schema_migrations`. The current source range is
-   `000001`–`000009`. Review the deployment log and resulting schema before
+   `000001`–`000010`. Review the deployment log and resulting schema before
    continuing.
 3. Create a verified database backup before applying a schema change.
 4. Configure production secrets outside the repository.
