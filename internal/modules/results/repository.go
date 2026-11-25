@@ -27,19 +27,6 @@ func (r *Repository) ExamCourseID(ctx context.Context, examID string) (string, e
 	return exam.CourseID, err
 }
 
-func (r *Repository) ListByExam(ctx context.Context, examID string, page pagination.Request) ([]resultRow, int64, error) {
-	query := r.db.WithContext(ctx).Table("results r").Where("r.exam_id = ?", examID)
-	var total int64
-	if err := query.Count(&total).Error; err != nil {
-		return nil, 0, err
-	}
-	var rows []resultRow
-	err := query.Select("r.*, e.title AS exam_title, u.full_name AS student_name, u.identifier").
-		Joins("JOIN exams e ON e.id = r.exam_id").Joins("JOIN users u ON u.id = r.student_id").
-		Order("u.full_name ASC").Offset(page.Offset()).Limit(page.PerPage).Scan(&rows).Error
-	return rows, total, err
-}
-
 func (r *Repository) ListScoped(ctx context.Context, role, userID string, filter ListFilter, page pagination.Request) ([]resultRow, int64, error) {
 	query := r.db.WithContext(ctx).Table("results r").
 		Joins("JOIN exams e ON e.id = r.exam_id").
@@ -99,17 +86,4 @@ func (r *Repository) ListPublishedForStudent(ctx context.Context, studentID stri
 	err := query.Select("r.*, e.title AS exam_title, e.course_id AS course_id, c.name AS course_name").
 		Order("r.published_at DESC").Offset(page.Offset()).Limit(page.PerPage).Scan(&rows).Error
 	return rows, total, err
-}
-
-func (r *Repository) FindPublishedForStudent(ctx context.Context, id, studentID string) (resultRow, error) {
-	var row resultRow
-	err := r.db.WithContext(ctx).Table("results r").Select("r.*, e.title AS exam_title").Joins("JOIN exams e ON e.id = r.exam_id").
-		Where("r.id = ? AND r.student_id = ? AND r.status = 'published'", id, studentID).Scan(&row).Error
-	if err != nil {
-		return resultRow{}, err
-	}
-	if row.ID == "" {
-		return resultRow{}, ErrNotFound
-	}
-	return row, nil
 }

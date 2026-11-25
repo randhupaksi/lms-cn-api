@@ -26,25 +26,6 @@ func NewService(repository *Repository, academicsService academics.CourseManager
 	return &Service{repository: repository, academics: academicsService, audit: auditRecorder, now: time.Now}
 }
 
-func (s *Service) ListByExam(ctx context.Context, actor authz.Principal, examID string, page pagination.Request) ([]Response, int64, error) {
-	courseID, err := s.repository.ExamCourseID(ctx, examID)
-	if err != nil {
-		return nil, 0, mapResultError(err)
-	}
-	if err := s.academics.RequireCourseManager(ctx, actor, courseID); err != nil {
-		return nil, 0, err
-	}
-	rows, total, err := s.repository.ListByExam(ctx, examID, page)
-	if err != nil {
-		return nil, 0, mapResultError(err)
-	}
-	result := make([]Response, len(rows))
-	for i, row := range rows {
-		result[i] = toResponse(row, true)
-	}
-	return result, total, nil
-}
-
 func (s *Service) ListScoped(ctx context.Context, actor authz.Principal, filter ListFilter, page pagination.Request) ([]Response, int64, error) {
 	if err := actor.RequireRole(string(users.RoleSuperadmin), string(users.RolePrincipal), string(users.RoleCurriculum), string(users.RoleAdmin), string(users.RoleTeacher)); err != nil {
 		return nil, 0, err
@@ -132,17 +113,6 @@ func (s *Service) ListStudent(ctx context.Context, actor authz.Principal, page p
 		result[i] = toResponse(row, false)
 	}
 	return result, total, nil
-}
-
-func (s *Service) FindStudent(ctx context.Context, actor authz.Principal, id string) (Response, error) {
-	if actor.Role != string(users.RoleStudent) {
-		return Response{}, apperror.New(http.StatusForbidden, "STUDENT_ONLY", "Hasil ini hanya tersedia untuk siswa")
-	}
-	row, err := s.repository.FindPublishedForStudent(ctx, id, actor.UserID)
-	if err != nil {
-		return Response{}, mapResultError(err)
-	}
-	return toResponse(row, false), nil
 }
 
 func mapResultError(err error) error {

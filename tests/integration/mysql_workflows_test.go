@@ -35,6 +35,7 @@ import (
 	"lms-cn-api/internal/modules/users"
 	"lms-cn-api/internal/router"
 	"lms-cn-api/pkg/apperror"
+	"lms-cn-api/pkg/pagination"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -276,18 +277,36 @@ func TestMySQLSchoolWorkflows(t *testing.T) {
 		t.Fatalf("result was not graded as an unpublished draft: %v", err)
 	}
 	resultService := results.NewService(results.NewRepository(db), courseAccess, auditService)
-	if _, err := resultService.FindStudent(ctx, studentActor, resultRow.ID); err == nil {
+	studentResultContains := func(actor authz.Principal) (bool, error) {
+		items, _, err := resultService.ListStudent(ctx, actor, pagination.Request{Page: 1, PerPage: 100})
+		if err != nil {
+			return false, err
+		}
+		for _, item := range items {
+			if item.ID == resultRow.ID {
+				return true, nil
+			}
+		}
+		return false, nil
+	}
+	visible, err := studentResultContains(studentActor)
+	if err != nil {
+		t.Fatalf("list unpublished student result: %v", err)
+	}
+	if visible {
 		t.Fatal("a draft result should be invisible to the student")
 	}
 	published, err := resultService.PublishByExam(ctx, teacherActor, examID)
 	if err != nil || published != 1 {
 		t.Fatalf("publish result: published=%d, error=%v", published, err)
 	}
-	if _, err := resultService.FindStudent(ctx, studentActor, resultRow.ID); err != nil {
+	visible, err = studentResultContains(studentActor)
+	if err != nil || !visible {
 		t.Fatalf("the owning student could not read the published result: %v", err)
 	}
-	if _, err := resultService.FindStudent(ctx, outsiderActor, resultRow.ID); err == nil {
-		t.Fatal("a published result should be private to its student")
+	visible, err = studentResultContains(outsiderActor)
+	if err != nil || visible {
+		t.Fatalf("a published result should be private to its student: %v", err)
 	}
 }
 
@@ -453,7 +472,7 @@ func verifyMaterialFlow(t *testing.T, ctx context.Context, service *materials.Se
 	if err := service.Complete(ctx, student, material.ID); err != nil {
 		t.Fatal(err)
 	}
-	items, err := service.List(ctx, student, courseID)
+	items, _, err := service.ListPaged(ctx, student, courseID, pagination.Request{Page: 1, PerPage: 20}, materials.ListFilter{})
 	if err != nil || len(items) != 1 || items[0].CompletedAt == nil || len(items[0].Attachments) != 1 {
 		t.Fatalf("expected completed material with attachment metadata: %v", err)
 	}
@@ -497,7 +516,7 @@ func verifyAssignmentFlow(t *testing.T, ctx context.Context, service *assignment
 	if err := service.ReturnSubmission(ctx, teacher, submissions[0].ID, assignments.ReturnRequest{Feedback: "Revise bagian kesimpulan"}); err != nil {
 		t.Fatal(err)
 	}
-	items, err := service.List(ctx, student, courseID)
+	items, _, err := service.ListPaged(ctx, student, courseID, pagination.Request{Page: 1, PerPage: 20}, assignments.ListFilter{})
 	if err != nil || len(items) != 1 || items[0].Submission == nil || items[0].Submission.Status != "returned" || items[0].Submission.Feedback != "Revise bagian kesimpulan" {
 		t.Fatalf("expected student-visible returned submission with feedback: %v", err)
 	}
@@ -511,7 +530,7 @@ func verifyAssignmentFlow(t *testing.T, ctx context.Context, service *assignment
 	if err := service.Submit(ctx, student, assignment.ID, resubmission); err != nil {
 		t.Fatalf("same-payload retry should be idempotent: %v", err)
 	}
-	items, err = service.List(ctx, student, courseID)
+	items, _, err = service.ListPaged(ctx, student, courseID, pagination.Request{Page: 1, PerPage: 20}, assignments.ListFilter{})
 	if err != nil || len(items) != 1 || items[0].Submission == nil || items[0].Submission.Status != "submitted" || items[0].Submission.Content != resubmission.Content || items[0].Submission.Feedback != "" || items[0].Submission.Score != nil {
 		t.Fatalf("expected revised submission without stale feedback or score: %v", err)
 	}
@@ -525,7 +544,7 @@ func verifyAssignmentFlow(t *testing.T, ctx context.Context, service *assignment
 	if err := service.Submit(ctx, student, assignment.ID, assignments.SubmitRequest{Content: "Overwritten after grading"}); err == nil {
 		t.Fatal("student should not overwrite a graded submission")
 	}
-	items, err = service.List(ctx, student, courseID)
+	items, _, err = service.ListPaged(ctx, student, courseID, pagination.Request{Page: 1, PerPage: 20}, assignments.ListFilter{})
 	if err != nil || len(items) != 1 || items[0].Submission == nil || items[0].Submission.Score == nil || *items[0].Submission.Score != 8 || items[0].Submission.Content != resubmission.Content {
 		t.Fatalf("expected graded content and score to be preserved: %v", err)
 	}

@@ -59,7 +59,6 @@ func (h *Handler) exportByExam(c *gin.Context) {
 
 func (h *Handler) RegisterStudentRoutes(group *gin.RouterGroup) {
 	group.GET("", h.listStudent)
-	group.GET("/:resultID", h.findStudent)
 }
 
 func (h *Handler) listByExam(c *gin.Context) {
@@ -99,19 +98,4 @@ func (h *Handler) listStudent(c *gin.Context) {
 		return
 	}
 	response.SuccessWithMeta(c, http.StatusOK, "Hasil siswa berhasil dimuat", data, page.Meta(total))
-}
-
-func (h *Handler) findStudent(c *gin.Context) {
-	resultID, err := request.RequireID(c, "resultID")
-	if err != nil {
-		response.FromError(c, err)
-		return
-	}
-	principal, _ := middleware.Principal(c)
-	data, err := h.service.FindStudent(c.Request.Context(), principal, resultID)
-	if err != nil {
-		response.FromError(c, err)
-		return
-	}
-	response.Success(c, http.StatusOK, "Hasil siswa berhasil dimuat", data)
 }
