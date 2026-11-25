@@ -127,20 +127,6 @@ func (r *Repository) DeleteAttachment(ctx context.Context, materialID, attachmen
 	})
 }
 
-func (r *Repository) List(ctx context.Context, courseID, studentID string, publishedOnly bool) ([]materialRow, error) {
-	query := r.db.WithContext(ctx).Table("course_materials m").Select("m.*")
-	if studentID != "" {
-		query = query.Select("m.*, mp.completed_at").Joins("LEFT JOIN material_progress mp ON mp.material_id = m.id AND mp.student_id = ?", studentID)
-	}
-	query = query.Where("m.course_id = ?", courseID)
-	if publishedOnly {
-		query = query.Where("m.status = ?", StatusPublished)
-	}
-	var rows []materialRow
-	err := query.Order("m.position ASC, m.created_at ASC").Scan(&rows).Error
-	return rows, err
-}
-
 func (r *Repository) ListPaged(ctx context.Context, courseID, role, userID string, page pagination.Request, filter ListFilter) ([]materialRow, int64, error) {
 	query := r.db.WithContext(ctx).Table("course_materials m").
 		Select("m.*, c.name AS course_name").

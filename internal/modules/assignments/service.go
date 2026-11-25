@@ -29,27 +29,6 @@ func NewService(repository *Repository, academicsService academics.CourseAccess,
 	return &Service{repository: repository, academics: academicsService, audit: auditRecorder, now: time.Now}
 }
 
-func (s *Service) List(ctx context.Context, actor authz.Principal, courseID string) ([]Response, error) {
-	studentID, publishedOnly := "", false
-	if actor.Role == "student" {
-		if err := s.academics.RequireCourseStudent(ctx, actor, courseID); err != nil {
-			return nil, err
-		}
-		studentID, publishedOnly = actor.UserID, true
-	} else if err := s.academics.RequireCourseManager(ctx, actor, courseID); err != nil {
-		return nil, err
-	}
-	rows, err := s.repository.List(ctx, courseID, studentID, publishedOnly)
-	if err != nil {
-		return nil, apperror.Wrap(http.StatusInternalServerError, "ASSIGNMENTS_READ_FAILED", "Gagal memuat tugas", err)
-	}
-	result := make([]Response, len(rows))
-	for index, row := range rows {
-		result[index] = toResponse(row)
-	}
-	return result, nil
-}
-
 func (s *Service) ListPaged(ctx context.Context, actor authz.Principal, courseID string, page pagination.Request, filter ListFilter) ([]Response, int64, error) {
 	if courseID != "" {
 		if actor.Role == string(users.RoleStudent) {

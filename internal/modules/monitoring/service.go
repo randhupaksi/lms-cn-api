@@ -37,6 +37,9 @@ func (s *Service) ExamStatus(ctx context.Context, actor authz.Principal, examID 
 	if err != nil {
 		return Summary{}, apperror.Wrap(http.StatusInternalServerError, "MONITORING_READ_FAILED", "Gagal memuat monitoring ujian", err)
 	}
+	if participants == nil {
+		participants = []ParticipantStatus{}
+	}
 	now := s.now().UTC()
 	result := Summary{ExamID: examID, ServerTime: now, Total: len(participants), Participants: participants}
 	for index := range result.Participants {
@@ -77,6 +80,9 @@ func (s *Service) ExamStatusPage(ctx context.Context, actor authz.Principal, exa
 	participants, total, err := s.repository.ParticipantsPage(ctx, examID, search, page)
 	if err != nil {
 		return Summary{}, 0, apperror.Wrap(http.StatusInternalServerError, "MONITORING_READ_FAILED", "Gagal memuat monitoring ujian", err)
+	}
+	if participants == nil {
+		participants = []ParticipantStatus{}
 	}
 	for index := range participants {
 		participant := &participants[index]

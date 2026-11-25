@@ -38,23 +38,6 @@ func (r *Repository) Find(ctx context.Context, id string) (Assignment, error) {
 	return assignment, nil
 }
 
-func (r *Repository) List(ctx context.Context, courseID, studentID string, publishedOnly bool) ([]assignmentRow, error) {
-	query := r.db.WithContext(ctx).Table("assignments a").Select("a.*").Where("a.course_id = ?", courseID)
-	if studentID != "" {
-		query = query.Select(`a.*, s.id AS submission_id, s.student_id AS submission_student_id,
-			s.content AS submission_content, s.attachment_url AS submission_attachment_url,
-			s.status AS submission_status, s.score AS submission_score, s.feedback AS submission_feedback,
-			s.submitted_at AS submission_submitted_at, s.graded_at AS submission_graded_at`).
-			Joins("LEFT JOIN assignment_submissions s ON s.assignment_id = a.id AND s.student_id = ?", studentID)
-	}
-	if publishedOnly {
-		query = query.Where("a.status IN ?", []string{StatusPublished, StatusClosed})
-	}
-	var rows []assignmentRow
-	err := query.Order("a.due_at ASC, a.created_at DESC").Scan(&rows).Error
-	return rows, err
-}
-
 func (r *Repository) ListPaged(ctx context.Context, courseID, role, userID string, page pagination.Request, filter ListFilter) ([]assignmentRow, int64, error) {
 	query := r.db.WithContext(ctx).Table("assignments a").
 		Select("a.*, c.name AS course_name").
