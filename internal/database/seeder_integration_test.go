@@ -47,9 +47,6 @@ func TestDemoRestartPreservesGovernance(t *testing.T) {
 	if err := tx.Model(&request).Updates(map[string]any{"status": "approved", "proposed_starts_at": start, "proposed_ends_at": end, "decided_at": time.Now().UTC()}).Error; err != nil {
 		t.Fatal("schedule fixture failed")
 	}
-	if err := tx.Model(&governance.Event{}).Where("id=?", seedID(900001)).Updates(map[string]any{"version": 2, "title": "Fictional edited agenda", "starts_at": start, "ends_at": end}).Error; err != nil {
-		t.Fatal("agenda fixture failed")
-	}
 	if err := SeedDemoData(context.Background(), tx); err != nil {
 		t.Fatal("restart seed failed")
 	}
@@ -63,10 +60,6 @@ func TestDemoRestartPreservesGovernance(t *testing.T) {
 	var schedule struct{ StartsAt time.Time }
 	if err := tx.Table("exams").Where("id=?", request.ExamID).Take(&schedule).Error; err != nil || !schedule.StartsAt.Equal(start) {
 		t.Fatal("approved schedule was reset")
-	}
-	var event governance.Event
-	if err := tx.First(&event, "id=?", seedID(900001)).Error; err != nil || event.Version != 2 || event.Title != "Fictional edited agenda" || !event.StartsAt.Equal(start) {
-		t.Fatal("edited agenda was reset")
 	}
 	var afterCount int64
 	tx.Model(&users.User{}).Count(&afterCount)

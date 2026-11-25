@@ -110,14 +110,9 @@ func (r *Repository) Requests(ctx context.Context, role, userID, status string, 
 	err := q.Select("g.id,g.exam_id,g.requester_id,g.reason,g.proposed_starts_at,g.proposed_ends_at,g.original_starts_at,g.original_ends_at,g.status,g.reviewer_id,g.decision_note,g.decided_at,g.created_at,e.title AS exam_title,c.name AS course_name,u.full_name AS requester_name,COALESCE(v.full_name,'') AS reviewer_name").Order("g.created_at DESC, g.id").Offset((page - 1) * size).Limit(size).Scan(&rows).Error
 	return rows, total, err
 }
-func (r *Repository) Events(ctx context.Context, from, to time.Time) ([]Event, error) {
-	rows := []Event{}
-	err := r.db.WithContext(ctx).Where("status='active' AND starts_at < ? AND ends_at > ?", to, from).Order("starts_at, id").Limit(500).Find(&rows).Error
-	return rows, err
-}
-func (r *Repository) ExamAgenda(ctx context.Context, from, to time.Time) ([]Event, error) {
-	rows := []Event{}
-	err := r.db.WithContext(ctx).Table("exams").Select("id,title,description,'exam' AS category,starts_at,ends_at,status,0 AS version").Where("status='published' AND starts_at < ? AND ends_at > ?", to, from).Order("starts_at,id").Limit(500).Scan(&rows).Error
+func (r *Repository) ExamAgenda(ctx context.Context, from, to time.Time) ([]AgendaItem, error) {
+	rows := []AgendaItem{}
+	err := r.db.WithContext(ctx).Table("exams").Select("id,title,'exam' AS category,starts_at,ends_at").Where("status='published' AND starts_at < ? AND ends_at > ?", to, from).Order("starts_at,id").Limit(500).Scan(&rows).Error
 	return rows, err
 }
 func (r *Repository) Settings(ctx context.Context) (Settings, error) {

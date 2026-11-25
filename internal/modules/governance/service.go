@@ -8,7 +8,6 @@ import (
 	"lms-cn-api/internal/authz"
 	"lms-cn-api/pkg/apperror"
 	"net/http"
-	"sort"
 	"strings"
 	"time"
 )
@@ -207,48 +206,18 @@ func (s *Service) Cancel(ctx context.Context, a authz.Principal, id string) erro
 		return validateDecision(v, e, a.UserID, "cancelled", s.now().UTC())
 	}))
 }
-func (s *Service) Agenda(ctx context.Context, a authz.Principal, from, to time.Time) ([]Event, error) {
+func (s *Service) Agenda(ctx context.Context, a authz.Principal, from, to time.Time) ([]AgendaItem, error) {
 	if err := academicCoordinator(a); err != nil {
 		return nil, err
 	}
 	if !to.After(from) || to.Sub(from) > 366*24*time.Hour {
 		return nil, apperror.New(422, "INVALID_DATE_RANGE", "Rentang agenda maksimal 366 hari")
 	}
-	events, err := s.repository.Events(ctx, from, to)
-	if err != nil {
-		return nil, failure(err)
-	}
 	exams, err := s.repository.ExamAgenda(ctx, from, to)
 	if err != nil {
 		return nil, failure(err)
 	}
-	events = append(events, exams...)
-	sort.Slice(events, func(i, j int) bool { return events[i].StartsAt.Before(events[j].StartsAt) })
-	return events, nil
-}
-func (s *Service) SaveEvent(ctx context.Context, a authz.Principal, id string, input EventInput) error {
-	if err := academicCoordinator(a); err != nil {
-		return err
-	}
-	if len([]rune(strings.TrimSpace(input.Title))) < 3 {
-		return apperror.New(422, "EVENT_TITLE_REQUIRED", "Judul agenda minimal 3 karakter")
-	}
-	if !input.EndsAt.After(input.StartsAt) {
-		return apperror.New(422, "INVALID_EVENT_DATES", "Akhir agenda harus setelah awal agenda")
-	}
-	create := id == ""
-	if create {
-		id = uuid.NewString()
-	}
-	now := s.now().UTC()
-	value := Event{ID: id, Title: strings.TrimSpace(input.Title), Description: strings.TrimSpace(input.Description), Category: input.Category, StartsAt: input.StartsAt.UTC(), EndsAt: input.EndsAt.UTC(), Status: "active", CreatedBy: a.UserID, CreatedAt: now, UpdatedAt: now, Version: input.Version}
-	return failure(s.repository.SaveEvent(ctx, value, a.UserID, create))
-}
-func (s *Service) ArchiveEvent(ctx context.Context, a authz.Principal, id string, version int) error {
-	if err := academicCoordinator(a); err != nil {
-		return err
-	}
-	return failure(s.repository.ArchiveEvent(ctx, id, a.UserID, version))
+	return exams, nil
 }
 func (s *Service) Settings(ctx context.Context, a authz.Principal) (Settings, error) {
 	if err := owner(a); err != nil {

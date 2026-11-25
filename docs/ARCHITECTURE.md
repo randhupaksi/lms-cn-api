@@ -70,7 +70,7 @@ not a separate persistence module or a grant of account/governance privileges.
 - Login protection combines a network-level request ceiling with a stricter
   per-identifier throttle whose in-memory key is SHA-256 hashed.
 - Audit reads admit admin, principal, and school superadmin. Teacher operational monitoring remains course-scoped.
-- `governance` owns school settings/history, agenda, schedule requests, readiness,
+- `governance` owns school settings/history, published exam schedules, schedule requests, readiness,
   data-quality checks and aggregate course reports. Public school profile is a
   whitelisted DTO. Schedule decisions lock the exam in the same transaction as
   request/audit writes; answer and result publication contracts stay teacher-owned.

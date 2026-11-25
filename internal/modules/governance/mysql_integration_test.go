@@ -120,22 +120,6 @@ func TestGovernanceMySQLTransactions(t *testing.T) {
 	if err != nil || len(history) == 0 {
 		t.Fatal("settings history absent")
 	}
-	eventInput := EventInput{Title: "Fictional school agenda", Category: "meeting", StartsAt: now.Add(24 * time.Hour), EndsAt: now.Add(25 * time.Hour)}
-	if err := school.SaveEvent(ctx, actor, "", eventInput); err != nil {
-		t.Fatal(err)
-	}
-	var event Event
-	if err := tx.Where("created_by=?", actor.UserID).First(&event).Error; err != nil {
-		t.Fatal(err)
-	}
-	eventInput.Version = event.Version
-	if err := school.SaveEvent(ctx, actor, event.ID, eventInput); err != nil {
-		t.Fatal(err)
-	}
-	assertCode(school.SaveEvent(ctx, actor, event.ID, eventInput), "STALE_EVENT")
-	if err := school.ArchiveEvent(ctx, actor, event.ID, 2); err != nil {
-		t.Fatal(err)
-	}
 	userService := users.NewService(users.NewRepository(tx))
 	_, err = userService.Update(ctx, authz.Principal{Role: "admin", UserID: target.ID}, ownerUser.ID, users.UpdateRequest{Status: users.StatusInactive})
 	assertCode(err, "PRIVILEGED_ACCOUNT_PROTECTED")

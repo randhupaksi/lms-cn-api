@@ -11,13 +11,12 @@ type SettingsInput struct {
 	Version          int     `json:"version" binding:"required,min=1"`
 	Reason           string  `json:"reason" binding:"required,min=10,max=500"`
 }
-type EventInput struct {
-	Title       string    `json:"title" binding:"required,min=3,max=180"`
-	Description string    `json:"description" binding:"max=2000"`
-	Category    string    `json:"category" binding:"required,oneof=academic holiday meeting announcement"`
-	StartsAt    time.Time `json:"starts_at" binding:"required"`
-	EndsAt      time.Time `json:"ends_at" binding:"required"`
-	Version     int       `json:"version" binding:"min=0"`
+type AgendaItem struct {
+	ID       string    `json:"id"`
+	Title    string    `json:"title"`
+	Category string    `json:"category"`
+	StartsAt time.Time `json:"starts_at"`
+	EndsAt   time.Time `json:"ends_at"`
 }
 type ScheduleInput struct {
 	ExamID           string    `json:"exam_id" binding:"required,uuid"`
@@ -64,7 +63,7 @@ type Overview struct {
 	Exams           []ExamReadiness `json:"exams" gorm:"-"`
 	ExamStates      []StateCount    `json:"exam_states" gorm:"-"`
 	Quality         []QualityGroup  `json:"quality" gorm:"-"`
-	Agenda          []Event         `json:"agenda" gorm:"-"`
+	Agenda          []AgendaItem    `json:"agenda" gorm:"-"`
 }
 type Finding struct {
 	ID    string `json:"id"`

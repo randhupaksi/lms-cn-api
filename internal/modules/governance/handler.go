@@ -30,14 +30,7 @@ func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
 	group.POST("/requests/:id/decision", h.decide)
 	group.POST("/requests/:id/cancel", h.cancel)
 	group.GET("/request-exams", h.exams)
-	actions := group.Group("/actions")
-	actions.Use(middleware.RequireRoles("superadmin", "principal", "curriculum", "admin", "teacher"))
-	actions.GET("", h.leadershipActions)
-	actions.GET("/summary", h.leadershipActionSummary)
-	actions.GET("/assignees", h.leadershipActionAssignees)
-	actions.POST("", h.createLeadershipAction)
-	actions.GET("/:id/updates", h.leadershipActionUpdates)
-	actions.PATCH("/:id/status", h.updateLeadershipActionStatus)
+	group.GET("/agenda", h.agenda)
 	owner := group.Group("")
 	owner.Use(middleware.RequireRoles("superadmin", "principal"))
 	owner.GET("/overview", h.overview)
@@ -48,89 +41,6 @@ func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
 	owner.GET("/settings", h.settings)
 	owner.PUT("/settings", h.saveSettings)
 	owner.GET("/settings/history", h.history)
-	owner.GET("/events", h.events)
-	owner.POST("/events", h.createEvent)
-	owner.PUT("/events/:id", h.updateEvent)
-	owner.POST("/events/:id/archive", h.archive)
-}
-
-func (h *Handler) leadershipActions(c *gin.Context) {
-	a, _ := middleware.Principal(c)
-	p := pagination.FromContext(c)
-	data, total, err := h.service.ListLeadershipActions(c.Request.Context(), a, c.Query("status"), c.Query("category"), p.Page, p.PerPage)
-	if err != nil {
-		response.FromError(c, err)
-		return
-	}
-	response.SuccessWithMeta(c, http.StatusOK, "Tindak lanjut berhasil dimuat", data, p.Meta(total))
-}
-
-func (h *Handler) leadershipActionSummary(c *gin.Context) {
-	a, _ := middleware.Principal(c)
-	open, overdue, err := h.service.LeadershipActionCounts(c.Request.Context(), a)
-	if err != nil {
-		response.FromError(c, err)
-		return
-	}
-	response.Success(c, http.StatusOK, "Ringkasan tindak lanjut berhasil dimuat", gin.H{"open": open, "overdue": overdue})
-}
-
-func (h *Handler) leadershipActionAssignees(c *gin.Context) {
-	a, _ := middleware.Principal(c)
-	data, err := h.service.ActionAssignees(c.Request.Context(), a)
-	if err != nil {
-		response.FromError(c, err)
-		return
-	}
-	response.Success(c, http.StatusOK, "Daftar penanggung jawab berhasil dimuat", data)
-}
-
-func (h *Handler) createLeadershipAction(c *gin.Context) {
-	var body CreateLeadershipActionInput
-	if err := request.BindJSON(c, &body); err != nil {
-		response.FromError(c, err)
-		return
-	}
-	a, _ := middleware.Principal(c)
-	if err := h.service.CreateLeadershipAction(c.Request.Context(), a, body); err != nil {
-		response.FromError(c, err)
-		return
-	}
-	response.Success(c, http.StatusCreated, "Tindak lanjut berhasil dibuat", nil)
-}
-
-func (h *Handler) updateLeadershipActionStatus(c *gin.Context) {
-	id, err := request.RequireID(c, "id")
-	if err != nil {
-		response.FromError(c, err)
-		return
-	}
-	var body UpdateLeadershipActionStatusInput
-	if err := request.BindJSON(c, &body); err != nil {
-		response.FromError(c, err)
-		return
-	}
-	a, _ := middleware.Principal(c)
-	if err := h.service.UpdateLeadershipActionStatus(c.Request.Context(), a, id, body); err != nil {
-		response.FromError(c, err)
-		return
-	}
-	response.Success(c, http.StatusOK, "Status tindak lanjut berhasil diperbarui", nil)
-}
-
-func (h *Handler) leadershipActionUpdates(c *gin.Context) {
-	id, err := request.RequireID(c, "id")
-	if err != nil {
-		response.FromError(c, err)
-		return
-	}
-	a, _ := middleware.Principal(c)
-	data, err := h.service.LeadershipActionUpdates(c.Request.Context(), a, id)
-	if err != nil {
-		response.FromError(c, err)
-		return
-	}
-	response.Success(c, http.StatusOK, "Riwayat tindak lanjut berhasil dimuat", data)
 }
 func reply(c *gin.Context, data any, err error) {
 	if err != nil {
@@ -210,7 +120,7 @@ func (h *Handler) history(c *gin.Context) {
 	v, e := h.service.History(c.Request.Context(), a)
 	reply(c, v, e)
 }
-func (h *Handler) events(c *gin.Context) {
+func (h *Handler) agenda(c *gin.Context) {
 	zone := time.FixedZone("Asia/Jakarta", 7*3600)
 	now := time.Now().In(zone)
 	from := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, zone)
@@ -233,28 +143,6 @@ func (h *Handler) events(c *gin.Context) {
 	a, _ := middleware.Principal(c)
 	v, e := h.service.Agenda(c.Request.Context(), a, from.UTC(), to.UTC())
 	reply(c, v, e)
-}
-func (h *Handler) createEvent(c *gin.Context) { h.saveEvent(c, "") }
-func (h *Handler) updateEvent(c *gin.Context) { h.saveEvent(c, c.Param("id")) }
-func (h *Handler) saveEvent(c *gin.Context, id string) {
-	var body EventInput
-	if e := request.BindJSON(c, &body); e != nil {
-		response.FromError(c, e)
-		return
-	}
-	a, _ := middleware.Principal(c)
-	reply(c, nil, h.service.SaveEvent(c.Request.Context(), a, id, body))
-}
-func (h *Handler) archive(c *gin.Context) {
-	var body struct {
-		Version int `json:"version" binding:"required,min=1"`
-	}
-	if e := request.BindJSON(c, &body); e != nil {
-		response.FromError(c, e)
-		return
-	}
-	a, _ := middleware.Principal(c)
-	reply(c, nil, h.service.ArchiveEvent(c.Request.Context(), a, c.Param("id"), body.Version))
 }
 func (h *Handler) reports(c *gin.Context) {
 	a, _ := middleware.Principal(c)
